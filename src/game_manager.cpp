@@ -570,6 +570,34 @@ void GameManager::ApplyPBRLighting(Shader& shader, const glm::vec3& mainLightDir
     }
 }
 
+void GameManager::BindPBREnvironmentMaps(Shader& shader)
+{
+    ResourceManager& rm = ResourceManager::GetInstance();
+
+    glActiveTexture(GL_TEXTURE0 + TextureUnit::Irradiance);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, rm.GetIrradianceMap("skybox"));
+    shader.setInt("irradianceMap", TextureUnit::Irradiance);
+
+    glActiveTexture(GL_TEXTURE0 + TextureUnit::Prefilter);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, rm.GetPrefilterMap("skybox"));
+    shader.setInt("prefilterMap", TextureUnit::Prefilter);
+
+    glActiveTexture(GL_TEXTURE0 + TextureUnit::BRDFLUT);
+    glBindTexture(GL_TEXTURE_2D, rm.GetBRDFLUT());
+    shader.setInt("brdfLUT", TextureUnit::BRDFLUT);
+}
+
+void GameManager::ApplyPropPBRSettings(Shader& shader, const PropConfig& prop)
+{
+    shader.setVec3("u_AlbedoColor", glm::vec3(0.8f, 0.8f, 0.8f));
+    shader.setFloat("u_Metallic", 0.0f);
+    shader.setFloat("u_Roughness", 0.65f);
+    shader.setFloat("u_AO", 1.0f);
+    shader.setFloat("u_ModelBrightness", prop.PBRBrightness);
+    shader.setFloat("u_ModelAmbientIntensity", prop.PBRAmbientIntensity);
+    shader.setVec3("u_ModelAmbientColor", prop.PBRAmbientColor);
+}
+
 void GameManager::ApplyTerrainLighting(Shader& shader, const glm::vec3& mainLightDirection)
 {
     const LightingConfig& lighting = m_MapManager->GetCurrentLighting();
@@ -732,8 +760,7 @@ void GameManager::RenderProps(glm::mat4 projection, glm::mat4 view)
     if (m_PropModels.empty())
         return;
 
-    ResourceManager& rm = ResourceManager::GetInstance();
-    Shader* pbrShader = rm.GetShader("pbr_model");
+    Shader* pbrShader = ResourceManager::GetInstance().GetShader("pbr_model");
     if (!pbrShader) return;
 
     pbrShader->use();
@@ -741,19 +768,7 @@ void GameManager::RenderProps(glm::mat4 projection, glm::mat4 view)
     pbrShader->setMat4("projection", projection);
     pbrShader->setMat4("view", view);
     ApplyPBRLighting(*pbrShader, GetRotatedMainLightDirection());
-
-    // IBL texture binding
-    glActiveTexture(GL_TEXTURE0 + TextureUnit::Irradiance);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, rm.GetIrradianceMap("skybox"));
-    pbrShader->setInt("irradianceMap", TextureUnit::Irradiance);
-
-    glActiveTexture(GL_TEXTURE0 + TextureUnit::Prefilter);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, rm.GetPrefilterMap("skybox"));
-    pbrShader->setInt("prefilterMap", TextureUnit::Prefilter);
-
-    glActiveTexture(GL_TEXTURE0 + TextureUnit::BRDFLUT);
-    glBindTexture(GL_TEXTURE_2D, rm.GetBRDFLUT());
-    pbrShader->setInt("brdfLUT", TextureUnit::BRDFLUT);
+    BindPBREnvironmentMaps(*pbrShader);
 
     const MapConfig& currentMap = m_MapManager->GetCurrentMap();
 
@@ -770,13 +785,7 @@ void GameManager::RenderProps(glm::mat4 projection, glm::mat4 view)
         glm::mat3 normalMatrix = glm::mat3(glm::transpose(glm::inverse(model)));
         pbrShader->setMat3("normalMatrix", normalMatrix);
 
-        pbrShader->setVec3("u_AlbedoColor", glm::vec3(0.8f, 0.8f, 0.8f));
-        pbrShader->setFloat("u_Metallic", 0.0f);
-        pbrShader->setFloat("u_Roughness", 0.65f);
-        pbrShader->setFloat("u_AO", 1.0f);
-        pbrShader->setFloat("u_ModelBrightness", prop.PBRBrightness);
-        pbrShader->setFloat("u_ModelAmbientIntensity", prop.PBRAmbientIntensity);
-        pbrShader->setVec3("u_ModelAmbientColor", prop.PBRAmbientColor);
+        ApplyPropPBRSettings(*pbrShader, prop);
 
         it->second->Draw(*pbrShader);
     }

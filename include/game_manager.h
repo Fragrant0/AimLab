@@ -92,6 +92,8 @@ private:
     glm::vec3 GetRotatedMainLightDirection() const;
     glm::mat4 BuildPropModelMatrix(const PropConfig& prop, const Model& model) const;
     void ApplyPBRLighting(Shader& shader, const glm::vec3& mainLightDirection);
+    void BindPBREnvironmentMaps(Shader& shader);
+    void ApplyPropPBRSettings(Shader& shader, const PropConfig& prop);
     void ApplyTerrainLighting(Shader& shader, const glm::vec3& mainLightDirection);
 
     GLFWwindow* m_Window;
