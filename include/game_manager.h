@@ -23,6 +23,7 @@
 #include "pbr_prop_renderer.h"
 #include "weapon.h"
 #include "map_manager.h"
+#include "map_resource_loader.h"
 #include "ui_renderer.h"
 #include "font_renderer.h"
 #include "hit_feedback.h"
@@ -109,6 +110,7 @@ private:
 
     std::unique_ptr<Terrain> m_Terrain;
     std::unique_ptr<EcologySystem> m_EcologySystem;
+    MapResourceLoader m_MapResourceLoader;
     PBRPropRenderer m_PBRPropRenderer;
 
     std::map<std::string, std::unique_ptr<Model>> m_PropModels;

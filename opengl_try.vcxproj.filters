@@ -60,6 +60,9 @@
     <ClCompile Include="src\map_manager.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="src\map_resource_loader.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
     <ClCompile Include="src\ui_renderer.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
@@ -181,6 +184,9 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="include\map_manager.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\map_resource_loader.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="include\ui_renderer.h">

@@ -166,12 +166,6 @@ void GameManager::LoadResources()
     rm.LoadShader("weapon", "shaders/weapon.vs", "shaders/weapon.fs");
     rm.LoadShader("muzzle_flash", "shaders/muzzle_flash.vs", "shaders/muzzle_flash.fs");
 
-    for (int i = 0; i < m_MapManager->GetMapCount(); ++i)
-    {
-        const MapConfig& map = m_MapManager->GetMap(i);
-        rm.LoadTexture(map.FloorTextureName, map.FloorTexturePath.c_str());
-    }
-
     LoadMapResources();
 
     Shader* planeShader = rm.GetShader("plane");
@@ -218,28 +212,7 @@ void GameManager::LoadResources()
 
 void GameManager::LoadMapResources()
 {
-    ResourceManager& rm = ResourceManager::GetInstance();
-    const MapConfig& currentMap = m_MapManager->GetCurrentMap();
-
-    if (rm.GetTexture(currentMap.FloorTextureName) == 0)
-        rm.LoadTexture(currentMap.FloorTextureName, currentMap.FloorTexturePath.c_str());
-
-    if (currentMap.Skybox.Type == SkyboxType::HDR && !currentMap.Skybox.HDRPath.empty())
-    {
-        rm.LoadHDRSkybox("skybox", currentMap.Skybox.HDRPath.c_str());
-    }
-    else
-    {
-        rm.LoadCubemap("skybox", currentMap.Skybox.Faces);
-    }
-
-    for (const auto& prop : currentMap.Props)
-    {
-        if (!prop.ModelPath.empty() && m_PropModels.find(prop.ModelPath) == m_PropModels.end())
-        {
-            m_PropModels[prop.ModelPath] = std::make_unique<Model>(prop.ModelPath);
-        }
-    }
+    m_MapResourceLoader.Load(m_MapManager->GetCurrentMap(), m_PropModels);
 }
 
 void GameManager::UnloadMapResources(int mapIndex)
@@ -247,22 +220,7 @@ void GameManager::UnloadMapResources(int mapIndex)
     if (mapIndex < 0 || mapIndex >= m_MapManager->GetMapCount())
         return;
 
-    ResourceManager& rm = ResourceManager::GetInstance();
-    const MapConfig& oldMap = m_MapManager->GetMap(mapIndex);
-
-    rm.UnloadTexture(oldMap.FloorTextureName);
-
-    if (oldMap.Skybox.Type == SkyboxType::HDR)
-    {
-        rm.UnloadHDRSkybox("skybox");
-        rm.UnloadHDRTexture("skybox_hdr");
-    }
-    else
-    {
-        rm.UnloadCubemap("skybox");
-    }
-
-    m_PropModels.clear();
+    m_MapResourceLoader.Unload(m_MapManager->GetMap(mapIndex), m_PropModels);
 }
 
 void GameManager::SetupScene()

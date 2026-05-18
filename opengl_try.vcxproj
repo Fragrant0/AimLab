@@ -146,6 +146,7 @@
     <ClCompile Include="src\pbr_prop_renderer.cpp" />
     <ClCompile Include="src\weapon.cpp" />
     <ClCompile Include="src\map_manager.cpp" />
+    <ClCompile Include="src\map_resource_loader.cpp" />
     <ClCompile Include="src\ui_renderer.cpp" />
     <ClCompile Include="src\font_renderer.cpp" />
     <ClCompile Include="src\hit_feedback.cpp" />
@@ -208,6 +209,7 @@
     <ClInclude Include="include\pbr_prop_renderer.h" />
     <ClInclude Include="include\weapon.h" />
     <ClInclude Include="include\map_manager.h" />
+    <ClInclude Include="include\map_resource_loader.h" />
     <ClInclude Include="include\ui_renderer.h" />
     <ClInclude Include="include\font_renderer.h" />
     <ClInclude Include="include\hit_feedback.h" />
