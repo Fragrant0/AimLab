@@ -145,6 +145,7 @@
     <ClCompile Include="src\particle_system.cpp" />
     <ClCompile Include="src\pbr_prop_renderer.cpp" />
     <ClCompile Include="src\skybox_renderer.cpp" />
+    <ClCompile Include="src\terrain_renderer.cpp" />
     <ClCompile Include="src\weapon.cpp" />
     <ClCompile Include="src\map_manager.cpp" />
     <ClCompile Include="src\map_resource_loader.cpp" />
@@ -209,6 +210,7 @@
     <ClInclude Include="include\particle_system.h" />
     <ClInclude Include="include\pbr_prop_renderer.h" />
     <ClInclude Include="include\skybox_renderer.h" />
+    <ClInclude Include="include\terrain_renderer.h" />
     <ClInclude Include="include\weapon.h" />
     <ClInclude Include="include\map_manager.h" />
     <ClInclude Include="include\map_resource_loader.h" />

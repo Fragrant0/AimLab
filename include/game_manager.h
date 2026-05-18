@@ -29,6 +29,7 @@
 #include "font_renderer.h"
 #include "hit_feedback.h"
 #include "terrain.h"
+#include "terrain_renderer.h"
 #include "ecology_system.h"
 #include "screen_shake.h"
 #include "post_process_renderer.h"
@@ -93,7 +94,6 @@ private:
 
     glm::vec2 WorldToScreen(const glm::vec3& worldPos, const glm::mat4& projection, const glm::mat4& view);
     glm::vec3 GetRotatedMainLightDirection() const;
-    void ApplyTerrainLighting(Shader& shader, const glm::vec3& mainLightDirection);
 
     GLFWwindow* m_Window;
     Camera m_Camera;
@@ -104,14 +104,12 @@ private:
     bool m_FirstMouse;
     bool m_WireframeMode;
 
-    unsigned int m_PlaneVAO;
-    unsigned int m_PlaneVBO;
-
     std::unique_ptr<Terrain> m_Terrain;
     std::unique_ptr<EcologySystem> m_EcologySystem;
     MapResourceLoader m_MapResourceLoader;
     PBRPropRenderer m_PBRPropRenderer;
     SkyboxRenderer m_SkyboxRenderer;
+    TerrainRenderer m_TerrainRenderer;
 
     std::map<std::string, std::unique_ptr<Model>> m_PropModels;
 

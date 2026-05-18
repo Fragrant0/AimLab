@@ -57,6 +57,9 @@
     <ClCompile Include="src\skybox_renderer.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="src\terrain_renderer.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
     <ClCompile Include="src\weapon.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
@@ -184,6 +187,9 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="include\skybox_renderer.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\terrain_renderer.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="include\weapon.h">

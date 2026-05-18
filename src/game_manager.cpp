@@ -72,8 +72,6 @@ GameManager::GameManager()
       m_LastY(SCR_HEIGHT / 2.0f),
       m_FirstMouse(true),
       m_WireframeMode(false),
-      m_PlaneVAO(0),
-      m_PlaneVBO(0),
       m_SkyboxRotation(0.0f),
       m_Initialized(false),
       m_WireframePressed(false),
@@ -223,29 +221,7 @@ void GameManager::UnloadMapResources(int mapIndex)
 
 void GameManager::SetupScene()
 {
-    float planeVertices[] = {
-         5.0f, -0.5f,  5.0f,  0.0f, 1.0f, 0.0f,   2.0f, 0.0f,
-        -5.0f, -0.5f,  5.0f,  0.0f, 1.0f, 0.0f,   0.0f, 0.0f,
-        -5.0f, -0.5f, -5.0f,  0.0f, 1.0f, 0.0f,   0.0f, 2.0f,
-
-         5.0f, -0.5f,  5.0f,  0.0f, 1.0f, 0.0f,   2.0f, 0.0f,
-        -5.0f, -0.5f, -5.0f,  0.0f, 1.0f, 0.0f,   0.0f, 2.0f,
-         5.0f, -0.5f, -5.0f,  0.0f, 1.0f, 0.0f,   2.0f, 2.0f
-    };
-
-    glGenVertexArrays(1, &m_PlaneVAO);
-    glGenBuffers(1, &m_PlaneVBO);
-    glBindVertexArray(m_PlaneVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, m_PlaneVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(planeVertices), &planeVertices, GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
-    glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
-    glBindVertexArray(0);
-
+    m_TerrainRenderer.Initialize();
     m_SkyboxRenderer.Initialize();
 
     SetupTerrain();
@@ -440,24 +416,6 @@ glm::vec3 GameManager::GetRotatedMainLightDirection() const
     return direction;
 }
 
-void GameManager::ApplyTerrainLighting(Shader& shader, const glm::vec3& mainLightDirection)
-{
-    const LightingConfig& lighting = m_MapManager->GetCurrentLighting();
-    shader.setVec3("u_MainLightDirection", mainLightDirection);
-    shader.setVec3("u_MainLightColor", lighting.MainLight.Color);
-    shader.setFloat("u_MainLightIntensity", lighting.MainLight.Intensity);
-    shader.setBool("u_ShadowsEnabled", m_ShadowMapper != nullptr);
-    shader.setFloat("u_LightSize", lighting.MainLight.AngularSize);
-    shader.setFloat("u_ShadowBias", 0.0025f);
-    if (m_ShadowMapper)
-    {
-        shader.setMat4("u_LightSpaceMatrix", m_ShadowMapper->GetLightSpaceMatrix());
-        glActiveTexture(GL_TEXTURE0 + TextureUnit::Shadow);
-        glBindTexture(GL_TEXTURE_2D, m_ShadowMapper->GetDepthMap());
-        shader.setInt("u_ShadowMap", TextureUnit::Shadow);
-    }
-}
-
 void GameManager::RenderShadowMap(const glm::vec3& mainLightDirection)
 {
     if (!m_ShadowMapper)
@@ -492,16 +450,12 @@ void GameManager::RenderShadowTerrain(Shader& depthShader)
 {
     if (!m_Terrain || !m_Terrain->IsInitialized())
         return;
-    depthShader.setMat4("model", glm::mat4(1.0f));
-    m_Terrain->Render();
+    m_TerrainRenderer.RenderDepthHeightmap(*m_Terrain, depthShader);
 }
 
 void GameManager::RenderShadowPlane(Shader& depthShader)
 {
-    depthShader.setMat4("model", glm::mat4(1.0f));
-    glBindVertexArray(m_PlaneVAO);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-    glBindVertexArray(0);
+    m_TerrainRenderer.RenderDepthPlane(depthShader);
 }
 
 void GameManager::RenderShadowProps(Shader& depthShader)
@@ -545,43 +499,27 @@ void GameManager::RenderTerrain(glm::mat4 projection, glm::mat4 view)
     if (!m_Terrain || !m_Terrain->IsInitialized())
         return;
 
-    ResourceManager& rm = ResourceManager::GetInstance();
-    Shader* terrainShader = rm.GetShader("terrain");
-    if (!terrainShader) return;
-
-    terrainShader->use();
-    terrainShader->setMat4("projection", projection);
-    terrainShader->setMat4("view", view);
-    terrainShader->setVec3("ambientLight", m_MapManager->GetCurrentAmbientLight());
-    terrainShader->setVec3("viewPos", m_Camera.Position);
-    terrainShader->setMat4("model", glm::mat4(1.0f));
-    ApplyTerrainLighting(*terrainShader, GetRotatedMainLightDirection());
-
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, rm.GetTexture(m_MapManager->GetCurrentFloorTextureName()));
-
-    m_Terrain->Render();
+    m_TerrainRenderer.RenderHeightmap(*m_Terrain,
+                                      m_MapManager->GetCurrentFloorTextureName(),
+                                      m_MapManager->GetCurrentAmbientLight(),
+                                      m_Camera.Position,
+                                      projection,
+                                      view,
+                                      m_MapManager->GetCurrentLighting(),
+                                      GetRotatedMainLightDirection(),
+                                      m_ShadowMapper.get());
 }
 
 void GameManager::RenderPlane(glm::mat4 projection, glm::mat4 view)
 {
-    ResourceManager& rm = ResourceManager::GetInstance();
-    Shader* planeShader = rm.GetShader("plane");
-    if (!planeShader) return;
-
-    planeShader->use();
-    planeShader->setMat4("projection", projection);
-    planeShader->setMat4("view", view);
-    planeShader->setVec3("ambientLight", m_MapManager->GetCurrentAmbientLight());
-    planeShader->setVec3("viewPos", m_Camera.Position);
-    ApplyTerrainLighting(*planeShader, GetRotatedMainLightDirection());
-
-    glBindVertexArray(m_PlaneVAO);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, rm.GetTexture(m_MapManager->GetCurrentFloorTextureName()));
-    planeShader->setMat4("model", glm::mat4(1.0f));
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-    glBindVertexArray(0);
+    m_TerrainRenderer.RenderPlane(m_MapManager->GetCurrentFloorTextureName(),
+                                  m_MapManager->GetCurrentAmbientLight(),
+                                  m_Camera.Position,
+                                  projection,
+                                  view,
+                                  m_MapManager->GetCurrentLighting(),
+                                  GetRotatedMainLightDirection(),
+                                  m_ShadowMapper.get());
 }
 
 void GameManager::RenderProps(glm::mat4 projection, glm::mat4 view)
@@ -880,8 +818,7 @@ void GameManager::Cleanup()
     if (!m_Initialized)
         return;
 
-    if (m_PlaneVAO) { glDeleteVertexArrays(1, &m_PlaneVAO); m_PlaneVAO = 0; }
-    if (m_PlaneVBO) { glDeleteBuffers(1, &m_PlaneVBO); m_PlaneVBO = 0; }
+    m_TerrainRenderer.Cleanup();
     m_SkyboxRenderer.Cleanup();
 
     m_PropModels.clear();
