@@ -57,6 +57,12 @@ public:
             meshes[i].Draw(shader);
     }
 
+    void DrawGeometry() const
+    {
+        for (const Mesh& mesh : meshes)
+            mesh.DrawGeometry();
+    }
+
     glm::vec3 GetBoundsMin() const { return BoundsMin; }
     glm::vec3 GetBoundsMax() const { return BoundsMax; }
     glm::vec3 GetBoundsSize() const { return BoundsMax - BoundsMin; }
@@ -75,7 +81,8 @@ private:
             return;
         }
         // retrieve the directory path of the filepath
-        directory = path.substr(0, path.find_last_of('/'));
+        std::filesystem::path modelPath(path);
+        directory = modelPath.parent_path().empty() ? "." : modelPath.parent_path().generic_string();
 
         // process ASSIMP's root node recursively
         processNode(scene->mRootNode, scene, glm::mat4(1.0f));
@@ -428,7 +435,7 @@ unsigned int TextureFromFile(const char* path, const string& directory, bool gam
             }
         }
 
-        if (!data)
+        if (!data && fs::exists(modelDir))
         {
             for (const auto& entry : fs::recursive_directory_iterator(modelDir))
             {
@@ -454,6 +461,8 @@ unsigned int TextureFromFile(const char* path, const string& directory, bool gam
     {
         GLenum format;
         GLenum internalFormat;
+        format = GL_RGB;
+        internalFormat = gamma ? GL_SRGB : GL_RGB;
         if (nrComponents == 1)
         {
             format = GL_RED;

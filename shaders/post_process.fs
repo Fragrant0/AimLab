@@ -48,7 +48,6 @@ void main()
         color = texture(sceneTexture, uv).rgb;
     }
 
-    float luma = dot(color, vec3(0.2126, 0.7152, 0.0722));
     vec3 bloomApprox = max(color - vec3(max(bloomThreshold, 0.01)), vec3(0.0));
     color += bloomApprox * bloomIntensity;
 

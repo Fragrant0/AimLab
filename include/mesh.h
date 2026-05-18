@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <string>
+#include <utility>
 #include <vector>
 using namespace std;
 
@@ -48,13 +49,54 @@ public:
 
     // constructor
     Mesh(vector<Vertex> vertices, vector<unsigned int> indices, vector<Texture> textures)
+        : vertices(std::move(vertices)),
+          indices(std::move(indices)),
+          textures(std::move(textures)),
+          VAO(0),
+          VBO(0),
+          EBO(0)
     {
-        this->vertices = vertices;
-        this->indices = indices;
-        this->textures = textures;
-
         // now that we have all the required data, set the vertex buffers and its attribute pointers.
         setupMesh();
+    }
+
+    Mesh(const Mesh&) = delete;
+    Mesh& operator=(const Mesh&) = delete;
+
+    Mesh(Mesh&& other) noexcept
+        : vertices(std::move(other.vertices)),
+          indices(std::move(other.indices)),
+          textures(std::move(other.textures)),
+          VAO(other.VAO),
+          VBO(other.VBO),
+          EBO(other.EBO)
+    {
+        other.VAO = 0;
+        other.VBO = 0;
+        other.EBO = 0;
+    }
+
+    Mesh& operator=(Mesh&& other) noexcept
+    {
+        if (this != &other)
+        {
+            Cleanup();
+            vertices = std::move(other.vertices);
+            indices = std::move(other.indices);
+            textures = std::move(other.textures);
+            VAO = other.VAO;
+            VBO = other.VBO;
+            EBO = other.EBO;
+            other.VAO = 0;
+            other.VBO = 0;
+            other.EBO = 0;
+        }
+        return *this;
+    }
+
+    ~Mesh()
+    {
+        Cleanup();
     }
 
     // render the mesh
@@ -166,9 +208,23 @@ public:
         glActiveTexture(GL_TEXTURE0);
     }
 
+    void DrawGeometry() const
+    {
+        glBindVertexArray(VAO);
+        glDrawElements(GL_TRIANGLES, static_cast<unsigned int>(indices.size()), GL_UNSIGNED_INT, 0);
+        glBindVertexArray(0);
+    }
+
 private:
     // render data 
     unsigned int VBO, EBO;
+
+    void Cleanup()
+    {
+        if (EBO) { glDeleteBuffers(1, &EBO); EBO = 0; }
+        if (VBO) { glDeleteBuffers(1, &VBO); VBO = 0; }
+        if (VAO) { glDeleteVertexArrays(1, &VAO); VAO = 0; }
+    }
 
     // initializes all the buffer objects/arrays
     void setupMesh()

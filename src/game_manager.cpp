@@ -645,7 +645,7 @@ void GameManager::RenderShadowProps(Shader& depthShader)
 
         glm::mat4 model = BuildPropModelMatrix(prop, *it->second);
         depthShader.setMat4("model", model);
-        it->second->Draw(depthShader);
+        it->second->DrawGeometry();
     }
 }
 

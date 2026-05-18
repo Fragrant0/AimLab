@@ -40,15 +40,15 @@ unsigned int ResourceManager::LoadTexture(const std::string& name, const char* p
         return m_Textures[name];
     }
 
-    unsigned int textureID;
+    unsigned int textureID = 0;
     glGenTextures(1, &textureID);
 
     int width, height, nrComponents;
     unsigned char* data = stbi_load(path, &width, &height, &nrComponents, 0);
     if (data)
     {
-        GLenum format;
-        GLenum internalFormat;
+        GLenum format = GL_RGB;
+        GLenum internalFormat = GL_RGB;
         if (nrComponents == 1)
         {
             format = GL_RED;
@@ -94,6 +94,8 @@ unsigned int ResourceManager::LoadTexture(const std::string& name, const char* p
     {
         std::cout << "Texture failed to load at path: " << path << std::endl;
         stbi_image_free(data);
+        glDeleteTextures(1, &textureID);
+        return 0;
     }
 
     m_Textures[name] = textureID;
@@ -257,6 +259,9 @@ unsigned int ResourceManager::LoadHDRTexture(const std::string& name, const char
             stbi_image_free(data);
         }
     }
+
+    if (hdrTexture == 0)
+        return 0;
 
     m_HDRTextures[name] = hdrTexture;
     return hdrTexture;
