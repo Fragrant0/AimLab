@@ -511,93 +511,6 @@ glm::vec3 GameManager::GetRotatedMainLightDirection() const
     return direction;
 }
 
-glm::mat4 GameManager::BuildPropModelMatrix(const PropConfig& prop, const Model& model) const
-{
-    const MapConfig& currentMap = m_MapManager->GetCurrentMap();
-    glm::vec3 propPosition = prop.Position;
-    if (currentMap.Terrain == TerrainType::Heightmap && m_Terrain && m_Terrain->IsInitialized())
-        propPosition.y = m_Terrain->GetHeightAt(propPosition.x, propPosition.z) + prop.Position.y;
-
-    glm::vec3 finalScale = prop.Scale;
-    const glm::vec3 boundsSize = model.GetBoundsSize();
-    if (prop.TargetHeight > 0.0f && boundsSize.y > 0.0001f)
-    {
-        const float normalizeScale = prop.TargetHeight / boundsSize.y;
-        finalScale *= normalizeScale;
-    }
-
-    propPosition.y -= model.GetBoundsMin().y * finalScale.y;
-
-    glm::mat4 matrix = glm::mat4(1.0f);
-    matrix = glm::translate(matrix, propPosition);
-    matrix = glm::rotate(matrix, glm::radians(prop.Rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
-    matrix = glm::rotate(matrix, glm::radians(prop.Rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
-    matrix = glm::rotate(matrix, glm::radians(prop.Rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
-    matrix = glm::scale(matrix, finalScale);
-    return matrix;
-}
-
-void GameManager::ApplyPBRLighting(Shader& shader, const glm::vec3& mainLightDirection)
-{
-    const LightingConfig& lighting = m_MapManager->GetCurrentLighting();
-    shader.setVec3("u_MainLight.direction", mainLightDirection);
-    shader.setVec3("u_MainLight.color", lighting.MainLight.Color);
-    shader.setFloat("u_MainLight.intensity", lighting.MainLight.Intensity);
-    shader.setFloat("u_IBLDiffuseIntensity", lighting.IBLDiffuseIntensity);
-    shader.setFloat("u_IBLSpecularIntensity", lighting.IBLSpecularIntensity);
-
-    int count = std::min(static_cast<int>(lighting.PointLights.size()), 8);
-    shader.setInt("u_PointLightCount", count);
-    for (int i = 0; i < count; ++i)
-    {
-        const PointLightConfig& light = lighting.PointLights[i];
-        std::string index = std::to_string(i);
-        shader.setVec3("u_PointLightPositions[" + index + "]", light.Position);
-        shader.setVec3("u_PointLightColors[" + index + "]", light.Color);
-        shader.setFloat("u_PointLightIntensities[" + index + "]", light.Intensity);
-        shader.setFloat("u_PointLightRanges[" + index + "]", light.Range);
-    }
-
-    shader.setBool("u_ShadowsEnabled", m_ShadowMapper != nullptr);
-    shader.setFloat("u_LightSize", lighting.MainLight.AngularSize);
-    shader.setFloat("u_ShadowBias", 0.0018f);
-    if (m_ShadowMapper)
-    {
-        shader.setMat4("u_LightSpaceMatrix", m_ShadowMapper->GetLightSpaceMatrix());
-        glActiveTexture(GL_TEXTURE0 + TextureUnit::Shadow);
-        glBindTexture(GL_TEXTURE_2D, m_ShadowMapper->GetDepthMap());
-        shader.setInt("u_ShadowMap", TextureUnit::Shadow);
-    }
-}
-
-void GameManager::BindPBREnvironmentMaps(Shader& shader)
-{
-    ResourceManager& rm = ResourceManager::GetInstance();
-
-    glActiveTexture(GL_TEXTURE0 + TextureUnit::Irradiance);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, rm.GetIrradianceMap("skybox"));
-    shader.setInt("irradianceMap", TextureUnit::Irradiance);
-
-    glActiveTexture(GL_TEXTURE0 + TextureUnit::Prefilter);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, rm.GetPrefilterMap("skybox"));
-    shader.setInt("prefilterMap", TextureUnit::Prefilter);
-
-    glActiveTexture(GL_TEXTURE0 + TextureUnit::BRDFLUT);
-    glBindTexture(GL_TEXTURE_2D, rm.GetBRDFLUT());
-    shader.setInt("brdfLUT", TextureUnit::BRDFLUT);
-}
-
-void GameManager::ApplyPropPBRSettings(Shader& shader, const PropConfig& prop)
-{
-    shader.setVec3("u_AlbedoColor", glm::vec3(0.8f, 0.8f, 0.8f));
-    shader.setFloat("u_Metallic", 0.0f);
-    shader.setFloat("u_Roughness", 0.65f);
-    shader.setFloat("u_AO", 1.0f);
-    shader.setFloat("u_ModelBrightness", prop.PBRBrightness);
-    shader.setFloat("u_ModelAmbientIntensity", prop.PBRAmbientIntensity);
-    shader.setVec3("u_ModelAmbientColor", prop.PBRAmbientColor);
-}
-
 void GameManager::ApplyTerrainLighting(Shader& shader, const glm::vec3& mainLightDirection)
 {
     const LightingConfig& lighting = m_MapManager->GetCurrentLighting();
@@ -664,20 +577,7 @@ void GameManager::RenderShadowPlane(Shader& depthShader)
 
 void GameManager::RenderShadowProps(Shader& depthShader)
 {
-    if (m_PropModels.empty())
-        return;
-
-    const MapConfig& currentMap = m_MapManager->GetCurrentMap();
-    for (const auto& prop : currentMap.Props)
-    {
-        auto it = m_PropModels.find(prop.ModelPath);
-        if (it == m_PropModels.end() || !it->second)
-            continue;
-
-        glm::mat4 model = BuildPropModelMatrix(prop, *it->second);
-        depthShader.setMat4("model", model);
-        it->second->DrawGeometry();
-    }
+    m_PBRPropRenderer.RenderDepth(m_MapManager->GetCurrentMap(), m_PropModels, m_Terrain.get(), depthShader);
 }
 
 void GameManager::RenderScene()
@@ -757,38 +657,14 @@ void GameManager::RenderPlane(glm::mat4 projection, glm::mat4 view)
 
 void GameManager::RenderProps(glm::mat4 projection, glm::mat4 view)
 {
-    if (m_PropModels.empty())
-        return;
-
-    Shader* pbrShader = ResourceManager::GetInstance().GetShader("pbr_model");
-    if (!pbrShader) return;
-
-    pbrShader->use();
-    pbrShader->setVec3("cameraPos", m_Camera.Position);
-    pbrShader->setMat4("projection", projection);
-    pbrShader->setMat4("view", view);
-    ApplyPBRLighting(*pbrShader, GetRotatedMainLightDirection());
-    BindPBREnvironmentMaps(*pbrShader);
-
-    const MapConfig& currentMap = m_MapManager->GetCurrentMap();
-
-    for (const auto& prop : currentMap.Props)
-    {
-        auto it = m_PropModels.find(prop.ModelPath);
-        if (it == m_PropModels.end() || !it->second)
-            continue;
-
-        glm::mat4 model = BuildPropModelMatrix(prop, *it->second);
-
-        pbrShader->setMat4("model", model);
-
-        glm::mat3 normalMatrix = glm::mat3(glm::transpose(glm::inverse(model)));
-        pbrShader->setMat3("normalMatrix", normalMatrix);
-
-        ApplyPropPBRSettings(*pbrShader, prop);
-
-        it->second->Draw(*pbrShader);
-    }
+    m_PBRPropRenderer.Render(m_MapManager->GetCurrentMap(),
+                             m_PropModels,
+                             m_Terrain.get(),
+                             m_Camera,
+                             projection,
+                             view,
+                             GetRotatedMainLightDirection(),
+                             m_ShadowMapper.get());
 }
 
 void GameManager::RenderSkybox(glm::mat4 projection, glm::mat4 view)

@@ -51,6 +51,9 @@
     <ClCompile Include="src\particle_system.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="src\pbr_prop_renderer.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
     <ClCompile Include="src\weapon.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
@@ -169,6 +172,9 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="include\particle_system.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\pbr_prop_renderer.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="include\weapon.h">

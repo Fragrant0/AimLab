@@ -20,6 +20,7 @@
 #include "raycast.h"
 #include "score_system.h"
 #include "particle_system.h"
+#include "pbr_prop_renderer.h"
 #include "weapon.h"
 #include "map_manager.h"
 #include "ui_renderer.h"
@@ -90,10 +91,6 @@ private:
 
     glm::vec2 WorldToScreen(const glm::vec3& worldPos, const glm::mat4& projection, const glm::mat4& view);
     glm::vec3 GetRotatedMainLightDirection() const;
-    glm::mat4 BuildPropModelMatrix(const PropConfig& prop, const Model& model) const;
-    void ApplyPBRLighting(Shader& shader, const glm::vec3& mainLightDirection);
-    void BindPBREnvironmentMaps(Shader& shader);
-    void ApplyPropPBRSettings(Shader& shader, const PropConfig& prop);
     void ApplyTerrainLighting(Shader& shader, const glm::vec3& mainLightDirection);
 
     GLFWwindow* m_Window;
@@ -112,6 +109,7 @@ private:
 
     std::unique_ptr<Terrain> m_Terrain;
     std::unique_ptr<EcologySystem> m_EcologySystem;
+    PBRPropRenderer m_PBRPropRenderer;
 
     std::map<std::string, std::unique_ptr<Model>> m_PropModels;
 
