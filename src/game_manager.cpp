@@ -1,5 +1,6 @@
 ﻿#include "game_manager.h"
 #include "gl_state_guard.h"
+#include "render_settings.h"
 #include "ui_utils.h"
 
 #include <algorithm>
@@ -139,7 +140,7 @@ bool GameManager::Initialize(GLFWwindow* window)
         m_PostProcessRenderer->Initialize(m_ScreenWidth, m_ScreenHeight);
 
         m_ShadowMapper = std::make_unique<ShadowMapper>();
-        m_ShadowMapper->Initialize(2048);
+        m_ShadowMapper->Initialize(RenderSettings::kShadowMapSize);
     }
     catch (const std::exception& e)
     {
@@ -198,17 +199,17 @@ void GameManager::LoadResources()
     if (pbrShader)
     {
         pbrShader->use();
-        pbrShader->setInt("irradianceMap", 6);
-        pbrShader->setInt("prefilterMap", 7);
-        pbrShader->setInt("brdfLUT", 8);
-        pbrShader->setInt("u_AlbedoMap", 0);
-        pbrShader->setInt("u_NormalMap", 1);
-        pbrShader->setInt("u_MetallicMap", 2);
-        pbrShader->setInt("u_RoughnessMap", 3);
-        pbrShader->setInt("u_AOMap", 4);
-        pbrShader->setInt("u_ARMMap", 5);
-        pbrShader->setInt("u_EmissiveMap", 9);
-        pbrShader->setInt("u_ShadowMap", 10);
+        pbrShader->setInt("irradianceMap", TextureUnit::Irradiance);
+        pbrShader->setInt("prefilterMap", TextureUnit::Prefilter);
+        pbrShader->setInt("brdfLUT", TextureUnit::BRDFLUT);
+        pbrShader->setInt("u_AlbedoMap", TextureUnit::Albedo);
+        pbrShader->setInt("u_NormalMap", TextureUnit::Normal);
+        pbrShader->setInt("u_MetallicMap", TextureUnit::Metallic);
+        pbrShader->setInt("u_RoughnessMap", TextureUnit::Roughness);
+        pbrShader->setInt("u_AOMap", TextureUnit::AO);
+        pbrShader->setInt("u_ARMMap", TextureUnit::ARM);
+        pbrShader->setInt("u_EmissiveMap", TextureUnit::Emissive);
+        pbrShader->setInt("u_ShadowMap", TextureUnit::Shadow);
         pbrShader->setFloat("u_ModelBrightness", 1.0f);
         pbrShader->setFloat("u_ModelAmbientIntensity", 0.35f);
         pbrShader->setVec3("u_ModelAmbientColor", glm::vec3(1.0f));
@@ -462,7 +463,7 @@ void GameManager::Update(float deltaTime)
     if (m_ScreenShake)
         m_ScreenShake->Update(deltaTime);
 
-    m_SkyboxRotation += deltaTime * 0.008f;
+    m_SkyboxRotation += deltaTime * RenderSettings::kSkyboxRotationSpeed;
 }
 
 void GameManager::Render()
@@ -563,9 +564,9 @@ void GameManager::ApplyPBRLighting(Shader& shader, const glm::vec3& mainLightDir
     if (m_ShadowMapper)
     {
         shader.setMat4("u_LightSpaceMatrix", m_ShadowMapper->GetLightSpaceMatrix());
-        glActiveTexture(GL_TEXTURE10);
+        glActiveTexture(GL_TEXTURE0 + TextureUnit::Shadow);
         glBindTexture(GL_TEXTURE_2D, m_ShadowMapper->GetDepthMap());
-        shader.setInt("u_ShadowMap", 10);
+        shader.setInt("u_ShadowMap", TextureUnit::Shadow);
     }
 }
 
@@ -581,9 +582,9 @@ void GameManager::ApplyTerrainLighting(Shader& shader, const glm::vec3& mainLigh
     if (m_ShadowMapper)
     {
         shader.setMat4("u_LightSpaceMatrix", m_ShadowMapper->GetLightSpaceMatrix());
-        glActiveTexture(GL_TEXTURE10);
+        glActiveTexture(GL_TEXTURE0 + TextureUnit::Shadow);
         glBindTexture(GL_TEXTURE_2D, m_ShadowMapper->GetDepthMap());
-        shader.setInt("u_ShadowMap", 10);
+        shader.setInt("u_ShadowMap", TextureUnit::Shadow);
     }
 }
 
@@ -742,17 +743,17 @@ void GameManager::RenderProps(glm::mat4 projection, glm::mat4 view)
     ApplyPBRLighting(*pbrShader, GetRotatedMainLightDirection());
 
     // IBL texture binding
-    glActiveTexture(GL_TEXTURE6);
+    glActiveTexture(GL_TEXTURE0 + TextureUnit::Irradiance);
     glBindTexture(GL_TEXTURE_CUBE_MAP, rm.GetIrradianceMap("skybox"));
-    pbrShader->setInt("irradianceMap", 6);
+    pbrShader->setInt("irradianceMap", TextureUnit::Irradiance);
 
-    glActiveTexture(GL_TEXTURE7);
+    glActiveTexture(GL_TEXTURE0 + TextureUnit::Prefilter);
     glBindTexture(GL_TEXTURE_CUBE_MAP, rm.GetPrefilterMap("skybox"));
-    pbrShader->setInt("prefilterMap", 7);
+    pbrShader->setInt("prefilterMap", TextureUnit::Prefilter);
 
-    glActiveTexture(GL_TEXTURE8);
+    glActiveTexture(GL_TEXTURE0 + TextureUnit::BRDFLUT);
     glBindTexture(GL_TEXTURE_2D, rm.GetBRDFLUT());
-    pbrShader->setInt("brdfLUT", 8);
+    pbrShader->setInt("brdfLUT", TextureUnit::BRDFLUT);
 
     const MapConfig& currentMap = m_MapManager->GetCurrentMap();
 

@@ -7,6 +7,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "shader.h"
+#include "render_settings.h"
 
 #include <algorithm>
 #include <string>
@@ -127,45 +128,45 @@ public:
 
             if (name == "texture_albedo" || name == "texture_diffuse")
             {
-                textureUnit = 0;
+                textureUnit = TextureUnit::Albedo;
                 shader.setInt("u_AlbedoMap", textureUnit);
                 shader.setBool("u_HasAlbedoMap", true);
                 number = std::to_string(diffuseNr++);
             }
             else if (name == "texture_normal")
             {
-                textureUnit = 1;
+                textureUnit = TextureUnit::Normal;
                 shader.setInt("u_NormalMap", textureUnit);
                 shader.setBool("u_HasNormalMap", true);
                 number = std::to_string(normalNr++);
             }
             else if (name == "texture_metallic")
             {
-                textureUnit = 2;
+                textureUnit = TextureUnit::Metallic;
                 shader.setInt("u_MetallicMap", textureUnit);
                 shader.setBool("u_HasMetallicMap", true);
             }
             else if (name == "texture_roughness")
             {
-                textureUnit = 3;
+                textureUnit = TextureUnit::Roughness;
                 shader.setInt("u_RoughnessMap", textureUnit);
                 shader.setBool("u_HasRoughnessMap", true);
             }
             else if (name == "texture_ao")
             {
-                textureUnit = 4;
+                textureUnit = TextureUnit::AO;
                 shader.setInt("u_AOMap", textureUnit);
                 shader.setBool("u_HasAOMap", true);
             }
             else if (name == "texture_arm")
             {
-                textureUnit = 5;
+                textureUnit = TextureUnit::ARM;
                 shader.setInt("u_ARMMap", textureUnit);
                 shader.setBool("u_HasARMMap", true);
             }
             else if (name == "texture_emissive")
             {
-                textureUnit = 9;
+                textureUnit = TextureUnit::Emissive;
                 shader.setInt("u_EmissiveMap", textureUnit);
                 shader.setBool("u_HasEmissiveMap", true);
             }
