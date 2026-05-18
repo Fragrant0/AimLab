@@ -21,6 +21,7 @@
 #include "score_system.h"
 #include "particle_system.h"
 #include "pbr_prop_renderer.h"
+#include "skybox_renderer.h"
 #include "weapon.h"
 #include "map_manager.h"
 #include "map_resource_loader.h"
@@ -105,13 +106,12 @@ private:
 
     unsigned int m_PlaneVAO;
     unsigned int m_PlaneVBO;
-    unsigned int m_SkyboxVAO;
-    unsigned int m_SkyboxVBO;
 
     std::unique_ptr<Terrain> m_Terrain;
     std::unique_ptr<EcologySystem> m_EcologySystem;
     MapResourceLoader m_MapResourceLoader;
     PBRPropRenderer m_PBRPropRenderer;
+    SkyboxRenderer m_SkyboxRenderer;
 
     std::map<std::string, std::unique_ptr<Model>> m_PropModels;
 

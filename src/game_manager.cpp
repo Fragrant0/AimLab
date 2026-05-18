@@ -74,8 +74,6 @@ GameManager::GameManager()
       m_WireframeMode(false),
       m_PlaneVAO(0),
       m_PlaneVBO(0),
-      m_SkyboxVAO(0),
-      m_SkyboxVBO(0),
       m_SkyboxRotation(0.0f),
       m_Initialized(false),
       m_WireframePressed(false),
@@ -235,26 +233,6 @@ void GameManager::SetupScene()
          5.0f, -0.5f, -5.0f,  0.0f, 1.0f, 0.0f,   2.0f, 2.0f
     };
 
-    float skyboxVertices[] = {
-        -1.0f,  1.0f, -1.0f,   -1.0f, -1.0f, -1.0f,    1.0f, -1.0f, -1.0f,
-         1.0f, -1.0f, -1.0f,    1.0f,  1.0f, -1.0f,   -1.0f,  1.0f, -1.0f,
-
-        -1.0f, -1.0f,  1.0f,   -1.0f, -1.0f, -1.0f,   -1.0f,  1.0f, -1.0f,
-        -1.0f,  1.0f, -1.0f,   -1.0f,  1.0f,  1.0f,   -1.0f, -1.0f,  1.0f,
-
-         1.0f, -1.0f, -1.0f,    1.0f, -1.0f,  1.0f,    1.0f,  1.0f,  1.0f,
-         1.0f,  1.0f,  1.0f,    1.0f,  1.0f, -1.0f,    1.0f, -1.0f, -1.0f,
-
-        -1.0f, -1.0f,  1.0f,   -1.0f,  1.0f,  1.0f,    1.0f,  1.0f,  1.0f,
-         1.0f,  1.0f,  1.0f,    1.0f, -1.0f,  1.0f,   -1.0f, -1.0f,  1.0f,
-
-        -1.0f,  1.0f, -1.0f,    1.0f,  1.0f, -1.0f,    1.0f,  1.0f,  1.0f,
-         1.0f,  1.0f,  1.0f,   -1.0f,  1.0f,  1.0f,   -1.0f,  1.0f, -1.0f,
-
-        -1.0f, -1.0f, -1.0f,   -1.0f, -1.0f,  1.0f,    1.0f, -1.0f, -1.0f,
-         1.0f, -1.0f, -1.0f,   -1.0f, -1.0f,  1.0f,    1.0f, -1.0f,  1.0f
-    };
-
     glGenVertexArrays(1, &m_PlaneVAO);
     glGenBuffers(1, &m_PlaneVBO);
     glBindVertexArray(m_PlaneVAO);
@@ -268,14 +246,7 @@ void GameManager::SetupScene()
     glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
     glBindVertexArray(0);
 
-    glGenVertexArrays(1, &m_SkyboxVAO);
-    glGenBuffers(1, &m_SkyboxVBO);
-    glBindVertexArray(m_SkyboxVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, m_SkyboxVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(skyboxVertices), &skyboxVertices, GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glBindVertexArray(0);
+    m_SkyboxRenderer.Initialize();
 
     SetupTerrain();
     SetupEcology();
@@ -627,33 +598,8 @@ void GameManager::RenderProps(glm::mat4 projection, glm::mat4 view)
 
 void GameManager::RenderSkybox(glm::mat4 projection, glm::mat4 view)
 {
-    ResourceManager& rm = ResourceManager::GetInstance();
-    Shader* skyboxShader = rm.GetShader("skybox");
-    if (!skyboxShader) return;
-
-    DepthFuncGuard depthFunc(GL_LEQUAL);
-
-    skyboxShader->use();
-    glm::mat4 skyboxView = glm::mat4(glm::mat3(m_Camera.GetViewMatrix()));
-    skyboxShader->setMat4("view", skyboxView);
-    skyboxShader->setMat4("projection", projection);
-    skyboxShader->setFloat("rotation", m_SkyboxRotation);
-
-    const MapConfig& currentMap = m_MapManager->GetCurrentMap();
-    bool isHDR = (currentMap.Skybox.Type == SkyboxType::HDR);
-    skyboxShader->setBool("isHDR", isHDR);
-    skyboxShader->setFloat("exposure", isHDR ? 1.25f : 1.0f);
-
-    glBindVertexArray(m_SkyboxVAO);
-    glActiveTexture(GL_TEXTURE0);
-
-    if (isHDR)
-        glBindTexture(GL_TEXTURE_CUBE_MAP, rm.GetHDRSkybox("skybox"));
-    else
-        glBindTexture(GL_TEXTURE_CUBE_MAP, rm.GetCubemap("skybox"));
-
-    glDrawArrays(GL_TRIANGLES, 0, 36);
-    glBindVertexArray(0);
+    (void)view;
+    m_SkyboxRenderer.Render(m_MapManager->GetCurrentMap(), projection, m_Camera.GetViewMatrix(), m_SkyboxRotation);
 }
 
 void GameManager::RenderTargets(glm::mat4 projection, glm::mat4 view)
@@ -935,9 +881,8 @@ void GameManager::Cleanup()
         return;
 
     if (m_PlaneVAO) { glDeleteVertexArrays(1, &m_PlaneVAO); m_PlaneVAO = 0; }
-    if (m_SkyboxVAO) { glDeleteVertexArrays(1, &m_SkyboxVAO); m_SkyboxVAO = 0; }
     if (m_PlaneVBO) { glDeleteBuffers(1, &m_PlaneVBO); m_PlaneVBO = 0; }
-    if (m_SkyboxVBO) { glDeleteBuffers(1, &m_SkyboxVBO); m_SkyboxVBO = 0; }
+    m_SkyboxRenderer.Cleanup();
 
     m_PropModels.clear();
 
