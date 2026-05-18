@@ -1,4 +1,5 @@
 ﻿#include "game_manager.h"
+#include "gl_state_guard.h"
 #include "ui_utils.h"
 
 #include <algorithm>
@@ -478,9 +479,10 @@ void GameManager::Render()
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
 
-    glPolygonMode(GL_FRONT_AND_BACK, m_WireframeMode ? GL_LINE : GL_FILL);
-    RenderScene();
-    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    {
+        PolygonModeGuard polygonMode(m_WireframeMode ? GL_LINE : GL_FILL);
+        RenderScene();
+    }
 
     if (m_PostProcessRenderer)
     {
@@ -785,9 +787,7 @@ void GameManager::RenderSkybox(glm::mat4 projection, glm::mat4 view)
     Shader* skyboxShader = rm.GetShader("skybox");
     if (!skyboxShader) return;
 
-    GLint prevDepthFunc;
-    glGetIntegerv(GL_DEPTH_FUNC, &prevDepthFunc);
-    glDepthFunc(GL_LEQUAL);
+    DepthFuncGuard depthFunc(GL_LEQUAL);
 
     skyboxShader->use();
     glm::mat4 skyboxView = glm::mat4(glm::mat3(m_Camera.GetViewMatrix()));
@@ -810,7 +810,6 @@ void GameManager::RenderSkybox(glm::mat4 projection, glm::mat4 view)
 
     glDrawArrays(GL_TRIANGLES, 0, 36);
     glBindVertexArray(0);
-    glDepthFunc(prevDepthFunc);
 }
 
 void GameManager::RenderTargets(glm::mat4 projection, glm::mat4 view)
