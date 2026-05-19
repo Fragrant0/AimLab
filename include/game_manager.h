@@ -84,6 +84,7 @@ private:
     void AdjustDebugParameter(float direction);
     void ResetDebugAdjustments();
     PostProcessConfig GetEffectivePostProcessConfig() const;
+    float GetEffectiveShadowBias() const;
     DebugOverlayState BuildDebugOverlayState(const glm::vec3& mainLightDirection) const;
 
     glm::vec2 WorldToScreen(const glm::vec3& worldPos, const glm::mat4& projection, const glm::mat4& view);
@@ -95,8 +96,7 @@ private:
         BloomIntensity,
         BloomThreshold,
         BloomRadius,
-        Contrast,
-        Saturation,
+        ShadowBias,
         Count
     };
 
@@ -141,11 +141,14 @@ private:
     bool m_DebugOverlayVisible;
     bool m_PostEffectsEnabled;
     bool m_BloomEnabled;
+    bool m_IBLEnabled;
+    bool m_PCSSEnabled;
     bool m_ShadowsEnabled;
     bool m_DebugF1Pressed;
     bool m_DebugF2Pressed;
     bool m_DebugF3Pressed;
     bool m_DebugF4Pressed;
+    bool m_DebugF5Pressed;
     bool m_DebugTabPressed;
     bool m_DebugDecreasePressed;
     bool m_DebugIncreasePressed;
@@ -155,8 +158,7 @@ private:
     float m_DebugBloomIntensityOffset;
     float m_DebugBloomThresholdOffset;
     float m_DebugBloomRadiusOffset;
-    float m_DebugContrastOffset;
-    float m_DebugSaturationOffset;
+    float m_DebugShadowBiasOffset;
 
     float m_HitMarkerTimer;
     bool m_HitMarkerActive;

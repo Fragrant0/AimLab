@@ -5,6 +5,7 @@ namespace RenderSettings
 {
     constexpr unsigned int kShadowMapSize = 2048;
     constexpr float kSkyboxRotationSpeed = 0.008f;
+    constexpr float kDefaultShadowBias = 0.0022f;
 }
 
 namespace TextureUnit

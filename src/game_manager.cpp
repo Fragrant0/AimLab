@@ -20,11 +20,14 @@ GameManager::GameManager()
       m_DebugOverlayVisible(false),
       m_PostEffectsEnabled(true),
       m_BloomEnabled(true),
+      m_IBLEnabled(true),
+      m_PCSSEnabled(true),
       m_ShadowsEnabled(true),
       m_DebugF1Pressed(false),
       m_DebugF2Pressed(false),
       m_DebugF3Pressed(false),
       m_DebugF4Pressed(false),
+      m_DebugF5Pressed(false),
       m_DebugTabPressed(false),
       m_DebugDecreasePressed(false),
       m_DebugIncreasePressed(false),
@@ -34,8 +37,7 @@ GameManager::GameManager()
       m_DebugBloomIntensityOffset(0.0f),
       m_DebugBloomThresholdOffset(0.0f),
       m_DebugBloomRadiusOffset(0.0f),
-      m_DebugContrastOffset(0.0f),
-      m_DebugSaturationOffset(0.0f),
+      m_DebugShadowBiasOffset(0.0f),
       m_HitMarkerTimer(0.0f),
       m_HitMarkerActive(false),
       m_ScreenWidth(SCR_WIDTH),
@@ -329,10 +331,13 @@ void GameManager::HandleDebugInput(GLFWwindow* window)
         m_PostEffectsEnabled = !m_PostEffectsEnabled;
 
     if (consumePress(glfwGetKey(window, GLFW_KEY_F3) == GLFW_PRESS, m_DebugF3Pressed))
-        m_BloomEnabled = !m_BloomEnabled;
+        m_IBLEnabled = !m_IBLEnabled;
 
     if (consumePress(glfwGetKey(window, GLFW_KEY_F4) == GLFW_PRESS, m_DebugF4Pressed))
-        m_ShadowsEnabled = !m_ShadowsEnabled;
+        m_PCSSEnabled = !m_PCSSEnabled;
+
+    if (consumePress(glfwGetKey(window, GLFW_KEY_F5) == GLFW_PRESS, m_DebugF5Pressed))
+        m_BloomEnabled = !m_BloomEnabled;
 
     if (consumePress(glfwGetKey(window, GLFW_KEY_TAB) == GLFW_PRESS, m_DebugTabPressed))
     {
@@ -384,11 +389,8 @@ void GameManager::AdjustDebugParameter(float direction)
     case DebugParameter::BloomRadius:
         adjustOffset(base.Bloom.Radius, m_DebugBloomRadiusOffset, 0.05f, 0.0f, 1.0f);
         break;
-    case DebugParameter::Contrast:
-        adjustOffset(base.Contrast, m_DebugContrastOffset, 0.05f, 0.5f, 2.0f);
-        break;
-    case DebugParameter::Saturation:
-        adjustOffset(base.Saturation, m_DebugSaturationOffset, 0.05f, 0.0f, 2.0f);
+    case DebugParameter::ShadowBias:
+        adjustOffset(RenderSettings::kDefaultShadowBias, m_DebugShadowBiasOffset, 0.0002f, 0.0001f, 0.02f);
         break;
     case DebugParameter::Count:
         break;
@@ -399,13 +401,14 @@ void GameManager::ResetDebugAdjustments()
 {
     m_PostEffectsEnabled = true;
     m_BloomEnabled = true;
+    m_IBLEnabled = true;
+    m_PCSSEnabled = true;
     m_ShadowsEnabled = true;
     m_DebugExposureOffset = 0.0f;
     m_DebugBloomIntensityOffset = 0.0f;
     m_DebugBloomThresholdOffset = 0.0f;
     m_DebugBloomRadiusOffset = 0.0f;
-    m_DebugContrastOffset = 0.0f;
-    m_DebugSaturationOffset = 0.0f;
+    m_DebugShadowBiasOffset = 0.0f;
 }
 
 PostProcessConfig GameManager::GetEffectivePostProcessConfig() const
@@ -416,9 +419,6 @@ PostProcessConfig GameManager::GetEffectivePostProcessConfig() const
     config.Bloom.Intensity = std::clamp(config.Bloom.Intensity + m_DebugBloomIntensityOffset, 0.0f, 2.0f);
     config.Bloom.Threshold = std::clamp(config.Bloom.Threshold + m_DebugBloomThresholdOffset, 0.0f, 5.0f);
     config.Bloom.Radius = std::clamp(config.Bloom.Radius + m_DebugBloomRadiusOffset, 0.0f, 1.0f);
-    config.Contrast = std::clamp(config.Contrast + m_DebugContrastOffset, 0.5f, 2.0f);
-    config.Saturation = std::clamp(config.Saturation + m_DebugSaturationOffset, 0.0f, 2.0f);
-
     if (!m_PostEffectsEnabled)
     {
         config.Contrast = 1.0f;
@@ -436,6 +436,11 @@ PostProcessConfig GameManager::GetEffectivePostProcessConfig() const
     return config;
 }
 
+float GameManager::GetEffectiveShadowBias() const
+{
+    return std::clamp(RenderSettings::kDefaultShadowBias + m_DebugShadowBiasOffset, 0.0001f, 0.02f);
+}
+
 DebugOverlayState GameManager::BuildDebugOverlayState(const glm::vec3& mainLightDirection) const
 {
     DebugOverlayState state;
@@ -443,11 +448,22 @@ DebugOverlayState GameManager::BuildDebugOverlayState(const glm::vec3& mainLight
     state.PostEffectsEnabled = m_PostEffectsEnabled;
     state.PostProcess = GetEffectivePostProcessConfig();
     state.BloomEnabled = m_PostEffectsEnabled && m_BloomEnabled && state.PostProcess.Bloom.Enabled;
-    state.ShadowsEnabled = m_ShadowsEnabled;
+    state.IBLEnabled = m_IBLEnabled;
+    state.PCSSEnabled = m_PCSSEnabled;
     state.WireframeEnabled = m_WireframeMode;
     state.SelectedParameter = static_cast<int>(m_DebugSelectedParameter);
     state.MainLightDirection = mainLightDirection;
     state.SkyboxRotationDegrees = glm::degrees(m_SkyboxRotation);
+    state.ShadowBias = GetEffectiveShadowBias();
+    if (m_MapManager)
+    {
+        const LightingConfig& lighting = m_MapManager->GetCurrentLighting();
+        state.MainLightIntensity = lighting.MainLight.Intensity;
+        state.AmbientIntensity = lighting.AmbientIntensity;
+        state.IBLDiffuseIntensity = lighting.IBLDiffuseIntensity;
+        state.IBLSpecularIntensity = lighting.IBLSpecularIntensity;
+        state.PointLightCount = static_cast<int>(lighting.PointLights.size());
+    }
     return state;
 }
 
@@ -575,6 +591,7 @@ void GameManager::RenderScene(const glm::vec3& mainLightDirection, ShadowMapper*
         view = m_ScreenShake->GetViewMatrix(view);
 
     const MapConfig& currentMap = m_MapManager->GetCurrentMap();
+    const float shadowBias = GetEffectiveShadowBias();
     {
         PolygonModeGuard worldPolygonMode(m_WireframeMode ? GL_LINE : GL_FILL);
 
@@ -588,7 +605,9 @@ void GameManager::RenderScene(const glm::vec3& mainLightDirection, ShadowMapper*
                                               view,
                                               m_MapManager->GetCurrentLighting(),
                                               mainLightDirection,
-                                              activeShadowMapper);
+                                              activeShadowMapper,
+                                              m_PCSSEnabled,
+                                              shadowBias);
         }
         else
         {
@@ -599,7 +618,9 @@ void GameManager::RenderScene(const glm::vec3& mainLightDirection, ShadowMapper*
                                           view,
                                           m_MapManager->GetCurrentLighting(),
                                           mainLightDirection,
-                                          activeShadowMapper);
+                                          activeShadowMapper,
+                                          m_PCSSEnabled,
+                                          shadowBias);
         }
 
         if (m_EcologySystem && m_EcologySystem->IsReady())
@@ -619,7 +640,10 @@ void GameManager::RenderScene(const glm::vec3& mainLightDirection, ShadowMapper*
                                  projection,
                                  view,
                                  mainLightDirection,
-                                 activeShadowMapper);
+                                 activeShadowMapper,
+                                 m_IBLEnabled,
+                                 m_PCSSEnabled,
+                                 shadowBias);
 
         m_TargetRenderer.Render(m_TargetManager.get(),
                                 m_Camera,

@@ -14,6 +14,7 @@ uniform vec3 u_MainLightColor;
 uniform float u_MainLightIntensity;
 uniform sampler2D u_ShadowMap;
 uniform bool u_ShadowsEnabled;
+uniform bool u_PCSSEnabled;
 uniform float u_LightSize;
 uniform float u_ShadowBias;
 
@@ -69,6 +70,9 @@ float CalculateShadow(vec3 N, vec3 L)
 
     float bias = max(u_ShadowBias * (1.0 - dot(N, L)), u_ShadowBias * 0.35);
     float receiverDepth = projCoords.z - bias;
+    if (!u_PCSSEnabled)
+        return PCF(projCoords, receiverDepth, 2.0);
+
     float avgBlockerDepth = SearchBlocker(projCoords, receiverDepth, max(u_LightSize * 120.0, 1.0));
     if (avgBlockerDepth < 0.0)
         return 0.0;

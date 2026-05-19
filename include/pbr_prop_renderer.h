@@ -26,7 +26,10 @@ public:
                 const glm::mat4& projection,
                 const glm::mat4& view,
                 const glm::vec3& mainLightDirection,
-                const ShadowMapper* shadowMapper);
+                const ShadowMapper* shadowMapper,
+                bool iblEnabled,
+                bool pcssEnabled,
+                float shadowBias);
 
     void RenderDepth(const MapConfig& map,
                      const ModelMap& models,
@@ -38,7 +41,10 @@ private:
                                const MapConfig& map, const Terrain* terrain) const;
     void ApplyLighting(Shader& shader, const MapConfig& map,
                        const glm::vec3& mainLightDirection,
-                       const ShadowMapper* shadowMapper);
+                       const ShadowMapper* shadowMapper,
+                       bool iblEnabled,
+                       bool pcssEnabled,
+                       float shadowBias);
     void BindEnvironmentMaps(Shader& shader);
     void ApplyPropSettings(Shader& shader, const PropConfig& prop);
 };

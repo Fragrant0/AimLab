@@ -30,7 +30,9 @@ public:
                          const glm::mat4& view,
                          const LightingConfig& lighting,
                          const glm::vec3& mainLightDirection,
-                         const ShadowMapper* shadowMapper);
+                         const ShadowMapper* shadowMapper,
+                         bool pcssEnabled,
+                         float shadowBias);
 
     void RenderPlane(const std::string& floorTextureName,
                      const glm::vec3& ambientLight,
@@ -39,7 +41,9 @@ public:
                      const glm::mat4& view,
                      const LightingConfig& lighting,
                      const glm::vec3& mainLightDirection,
-                     const ShadowMapper* shadowMapper);
+                     const ShadowMapper* shadowMapper,
+                     bool pcssEnabled,
+                     float shadowBias);
 
     void RenderDepthHeightmap(Terrain& terrain, Shader& depthShader);
     void RenderDepthPlane(Shader& depthShader);
@@ -48,7 +52,9 @@ private:
     void ApplyLighting(Shader& shader,
                        const LightingConfig& lighting,
                        const glm::vec3& mainLightDirection,
-                       const ShadowMapper* shadowMapper);
+                       const ShadowMapper* shadowMapper,
+                       bool pcssEnabled,
+                       float shadowBias);
 
     unsigned int m_PlaneVAO;
     unsigned int m_PlaneVBO;

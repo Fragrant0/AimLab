@@ -78,7 +78,9 @@ void TerrainRenderer::RenderHeightmap(Terrain& terrain,
                                       const glm::mat4& view,
                                       const LightingConfig& lighting,
                                       const glm::vec3& mainLightDirection,
-                                      const ShadowMapper* shadowMapper)
+                                      const ShadowMapper* shadowMapper,
+                                      bool pcssEnabled,
+                                      float shadowBias)
 {
     if (!terrain.IsInitialized())
         return;
@@ -94,7 +96,7 @@ void TerrainRenderer::RenderHeightmap(Terrain& terrain,
     terrainShader->setVec3("ambientLight", ambientLight);
     terrainShader->setVec3("viewPos", viewPos);
     terrainShader->setMat4("model", glm::mat4(1.0f));
-    ApplyLighting(*terrainShader, lighting, mainLightDirection, shadowMapper);
+    ApplyLighting(*terrainShader, lighting, mainLightDirection, shadowMapper, pcssEnabled, shadowBias);
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, rm.GetTexture(floorTextureName));
@@ -109,7 +111,9 @@ void TerrainRenderer::RenderPlane(const std::string& floorTextureName,
                                   const glm::mat4& view,
                                   const LightingConfig& lighting,
                                   const glm::vec3& mainLightDirection,
-                                  const ShadowMapper* shadowMapper)
+                                  const ShadowMapper* shadowMapper,
+                                  bool pcssEnabled,
+                                  float shadowBias)
 {
     if (m_PlaneVAO == 0)
         return;
@@ -124,7 +128,7 @@ void TerrainRenderer::RenderPlane(const std::string& floorTextureName,
     planeShader->setMat4("view", view);
     planeShader->setVec3("ambientLight", ambientLight);
     planeShader->setVec3("viewPos", viewPos);
-    ApplyLighting(*planeShader, lighting, mainLightDirection, shadowMapper);
+    ApplyLighting(*planeShader, lighting, mainLightDirection, shadowMapper, pcssEnabled, shadowBias);
 
     glBindVertexArray(m_PlaneVAO);
     glActiveTexture(GL_TEXTURE0);
@@ -157,14 +161,17 @@ void TerrainRenderer::RenderDepthPlane(Shader& depthShader)
 void TerrainRenderer::ApplyLighting(Shader& shader,
                                     const LightingConfig& lighting,
                                     const glm::vec3& mainLightDirection,
-                                    const ShadowMapper* shadowMapper)
+                                    const ShadowMapper* shadowMapper,
+                                    bool pcssEnabled,
+                                    float shadowBias)
 {
     shader.setVec3("u_MainLightDirection", mainLightDirection);
     shader.setVec3("u_MainLightColor", lighting.MainLight.Color);
     shader.setFloat("u_MainLightIntensity", lighting.MainLight.Intensity);
     shader.setBool("u_ShadowsEnabled", shadowMapper != nullptr);
+    shader.setBool("u_PCSSEnabled", pcssEnabled);
     shader.setFloat("u_LightSize", lighting.MainLight.AngularSize);
-    shader.setFloat("u_ShadowBias", 0.0025f);
+    shader.setFloat("u_ShadowBias", shadowBias);
 
     if (shadowMapper)
     {

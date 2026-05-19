@@ -94,7 +94,8 @@ namespace
 
         const std::string debugText =
             "调试面板后处理后效泛光阴影线框选择调整重置"
-            "曝光强度阈值半径对比饱和主光方向天空旋转开关左右";
+            "曝光强度阈值半径对比饱和主光方向天空旋转开关左右"
+            "图像光照环境漫反射镜面点光数量偏移模式加速";
         for (unsigned int codepoint : DecodeUTF8(debugText))
             add(codepoint);
 

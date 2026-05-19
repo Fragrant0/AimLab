@@ -40,9 +40,10 @@ namespace UILayout
     constexpr float CROSSHAIR_GAP = 4.0f;
     constexpr float CROSSHAIR_THICKNESS = 2.0f;
 
-    constexpr float DEBUG_PANEL_WIDTH = 540.0f;
-    constexpr float DEBUG_PANEL_HEIGHT = 225.0f;
-    constexpr float DEBUG_PANEL_PADDING = 6.0f;
+    constexpr float DEBUG_PANEL_WIDTH = 680.0f;
+    constexpr float DEBUG_PANEL_HEIGHT = 320.0f;
+    constexpr float DEBUG_PANEL_BOTTOM_OFFSET = 42.0f;
+    constexpr float DEBUG_PANEL_PADDING = 10.0f;
     constexpr float DEBUG_FONT_SCALE = 0.45f;
     constexpr float DEBUG_ROW_GAP = 1.0f;
 }
@@ -82,20 +83,19 @@ namespace
         case 1: return "泛光强度";
         case 2: return "泛光阈值";
         case 3: return "泛光半径";
-        case 4: return "对比";
-        case 5: return "饱和";
+        case 4: return "阴影偏移";
         default: return "--";
         }
     }
 
-    std::string FormatFloat(float value)
+    std::string FormatFloat(float value, int precision = 2)
     {
         std::ostringstream stream;
-        stream << std::fixed << std::setprecision(2) << value;
+        stream << std::fixed << std::setprecision(precision) << value;
         return stream.str();
     }
 
-    std::string DebugParamValue(int index, const PostProcessConfig& post)
+    std::string DebugParamValue(int index, const PostProcessConfig& post, float shadowBias)
     {
         switch (index)
         {
@@ -103,8 +103,7 @@ namespace
         case 1: return FormatFloat(post.Bloom.Intensity);
         case 2: return FormatFloat(post.Bloom.Threshold);
         case 3: return FormatFloat(post.Bloom.Radius);
-        case 4: return FormatFloat(post.Contrast);
-        case 5: return FormatFloat(post.Saturation);
+        case 4: return FormatFloat(shadowBias, 4);
         default: return "--";
         }
     }
@@ -350,7 +349,7 @@ void HudRenderer::RenderDebugOverlay(UIRenderer& uiRenderer,
                                       std::max(1.0f, w - margin * 2.0f));
     const float panelHeight = UIUtils::ScaleToScreen(UILayout::DEBUG_PANEL_HEIGHT, uiScale);
     const float panelX = margin;
-    const float panelY = margin;
+    const float panelY = margin + UIUtils::ScaleToScreen(UILayout::DEBUG_PANEL_BOTTOM_OFFSET, uiScale);
     const float padding = UIUtils::ScaleToScreen(UILayout::DEBUG_PANEL_PADDING, uiScale);
 
     uiRenderer.Begin();
@@ -377,19 +376,25 @@ void HudRenderer::RenderDebugOverlay(UIRenderer& uiRenderer,
 
     const PostProcessConfig& post = state.PostProcess;
     drawLine(std::string("调试  后效:") + OnOff(state.PostEffectsEnabled) +
-             "  泛光:" + OnOff(state.BloomEnabled) +
-             "  阴影:" + OnOff(state.ShadowsEnabled), titleColor);
-    drawLine("F1面板 F2后效 F3泛光 F4阴影", mutedColor);
-    drawLine("TAB选择  左右调整  R重置", mutedColor);
+             "  IBL:" + OnOff(state.IBLEnabled) +
+             "  PCSS:" + OnOff(state.PCSSEnabled) +
+             "  泛光:" + OnOff(state.BloomEnabled), titleColor);
+    drawLine("F1面板  F2后效  F3 IBL  F4 PCSS  F5泛光", mutedColor);
+    drawLine("TAB选择  左右调整  Shift加速  R重置", mutedColor);
     drawLine(std::string("> ") + DebugParamName(state.SelectedParameter) +
-             " " + DebugParamValue(state.SelectedParameter, post), selectedColor);
-    drawLine("曝光 " + FormatFloat(post.Exposure) +
-             "  强度 " + FormatFloat(post.Bloom.Intensity) +
-             "  阈值 " + FormatFloat(post.Bloom.Threshold), textColor);
-    drawLine("半径 " + FormatFloat(post.Bloom.Radius) +
-             "  对比 " + FormatFloat(post.Contrast) +
-             "  饱和 " + FormatFloat(post.Saturation), textColor);
-    drawLine(std::string("线框:") + OnOff(state.WireframeEnabled) +
-             "  主光:" + FormatVec3(state.MainLightDirection), mutedColor);
-    drawLine("天空旋转 " + FormatFloat(state.SkyboxRotationDegrees), mutedColor);
+             " " + DebugParamValue(state.SelectedParameter, post, state.ShadowBias), selectedColor);
+    drawLine("图像  曝光 " + FormatFloat(post.Exposure) +
+             "  泛光 " + FormatFloat(post.Bloom.Intensity) +
+             "  阈值 " + FormatFloat(post.Bloom.Threshold) +
+             "  半径 " + FormatFloat(post.Bloom.Radius), textColor);
+    drawLine(std::string("阴影  偏移 ") + FormatFloat(state.ShadowBias, 4) +
+             "  模式 " + (state.PCSSEnabled ? "PCSS" : "PCF") +
+             "  线框:" + OnOff(state.WireframeEnabled), textColor);
+    drawLine("光照  主强 " + FormatFloat(state.MainLightIntensity) +
+             "  环境 " + FormatFloat(state.AmbientIntensity) +
+             "  点光 " + std::to_string(state.PointLightCount), mutedColor);
+    drawLine("IBL  漫反射 " + FormatFloat(state.IBLDiffuseIntensity) +
+             "  镜面 " + FormatFloat(state.IBLSpecularIntensity), mutedColor);
+    drawLine(std::string("主光方向 ") + FormatVec3(state.MainLightDirection) +
+             "  天空 " + FormatFloat(state.SkyboxRotationDegrees), mutedColor);
 }

@@ -22,12 +22,19 @@ struct DebugOverlayState
     bool Visible = false;
     bool PostEffectsEnabled = true;
     bool BloomEnabled = true;
-    bool ShadowsEnabled = true;
+    bool IBLEnabled = true;
+    bool PCSSEnabled = true;
     bool WireframeEnabled = false;
     int SelectedParameter = 0;
     PostProcessConfig PostProcess;
     glm::vec3 MainLightDirection = glm::vec3(0.0f, -1.0f, 0.0f);
     float SkyboxRotationDegrees = 0.0f;
+    float ShadowBias = 0.0f;
+    float MainLightIntensity = 0.0f;
+    float AmbientIntensity = 0.0f;
+    float IBLDiffuseIntensity = 0.0f;
+    float IBLSpecularIntensity = 0.0f;
+    int PointLightCount = 0;
 };
 
 class HudRenderer

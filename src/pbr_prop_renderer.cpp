@@ -14,7 +14,10 @@ void PBRPropRenderer::Render(const MapConfig& map,
                              const glm::mat4& projection,
                              const glm::mat4& view,
                              const glm::vec3& mainLightDirection,
-                             const ShadowMapper* shadowMapper)
+                             const ShadowMapper* shadowMapper,
+                             bool iblEnabled,
+                             bool pcssEnabled,
+                             float shadowBias)
 {
     if (models.empty())
         return;
@@ -27,7 +30,7 @@ void PBRPropRenderer::Render(const MapConfig& map,
     shader->setVec3("cameraPos", camera.Position);
     shader->setMat4("projection", projection);
     shader->setMat4("view", view);
-    ApplyLighting(*shader, map, mainLightDirection, shadowMapper);
+    ApplyLighting(*shader, map, mainLightDirection, shadowMapper, iblEnabled, pcssEnabled, shadowBias);
     BindEnvironmentMaps(*shader);
 
     for (const PropConfig& prop : map.Props)
@@ -92,14 +95,17 @@ glm::mat4 PBRPropRenderer::BuildModelMatrix(const PropConfig& prop, const Model&
 
 void PBRPropRenderer::ApplyLighting(Shader& shader, const MapConfig& map,
                                     const glm::vec3& mainLightDirection,
-                                    const ShadowMapper* shadowMapper)
+                                    const ShadowMapper* shadowMapper,
+                                    bool iblEnabled,
+                                    bool pcssEnabled,
+                                    float shadowBias)
 {
     const LightingConfig& lighting = map.Lighting;
     shader.setVec3("u_MainLight.direction", mainLightDirection);
     shader.setVec3("u_MainLight.color", lighting.MainLight.Color);
     shader.setFloat("u_MainLight.intensity", lighting.MainLight.Intensity);
-    shader.setFloat("u_IBLDiffuseIntensity", lighting.IBLDiffuseIntensity);
-    shader.setFloat("u_IBLSpecularIntensity", lighting.IBLSpecularIntensity);
+    shader.setFloat("u_IBLDiffuseIntensity", iblEnabled ? lighting.IBLDiffuseIntensity : 0.0f);
+    shader.setFloat("u_IBLSpecularIntensity", iblEnabled ? lighting.IBLSpecularIntensity : 0.0f);
 
     int count = std::min(static_cast<int>(lighting.PointLights.size()), 8);
     shader.setInt("u_PointLightCount", count);
@@ -114,8 +120,9 @@ void PBRPropRenderer::ApplyLighting(Shader& shader, const MapConfig& map,
     }
 
     shader.setBool("u_ShadowsEnabled", shadowMapper != nullptr);
+    shader.setBool("u_PCSSEnabled", pcssEnabled);
     shader.setFloat("u_LightSize", lighting.MainLight.AngularSize);
-    shader.setFloat("u_ShadowBias", 0.0018f);
+    shader.setFloat("u_ShadowBias", shadowBias);
     if (shadowMapper)
     {
         shader.setMat4("u_LightSpaceMatrix", shadowMapper->GetLightSpaceMatrix());

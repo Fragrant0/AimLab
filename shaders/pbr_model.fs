@@ -54,6 +54,7 @@ uniform bool u_HasEmissiveMap;
 
 uniform sampler2D u_ShadowMap;
 uniform bool u_ShadowsEnabled;
+uniform bool u_PCSSEnabled;
 uniform float u_LightSize;
 uniform float u_ShadowBias;
 
@@ -150,6 +151,9 @@ float CalculatePCSSShadow(vec3 N, vec3 L)
 
     float bias = max(u_ShadowBias * (1.0 - dot(N, L)), u_ShadowBias * 0.35);
     float receiverDepth = projCoords.z - bias;
+    if (!u_PCSSEnabled)
+        return PCF(projCoords, receiverDepth, 2.0);
+
     float searchRadius = max(u_LightSize * 120.0, 1.0);
     float avgBlockerDepth = SearchBlocker(projCoords, receiverDepth, searchRadius);
     if (avgBlockerDepth < 0.0)
