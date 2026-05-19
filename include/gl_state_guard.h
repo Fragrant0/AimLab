@@ -35,8 +35,7 @@ public:
 
     ~PolygonModeGuard()
     {
-        glPolygonMode(GL_FRONT, static_cast<GLenum>(m_Previous[0]));
-        glPolygonMode(GL_BACK, static_cast<GLenum>(m_Previous[1]));
+        glPolygonMode(GL_FRONT_AND_BACK, static_cast<GLenum>(m_Previous[0]));
     }
 
     PolygonModeGuard(const PolygonModeGuard&) = delete;

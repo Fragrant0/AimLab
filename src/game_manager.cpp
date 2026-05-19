@@ -327,10 +327,7 @@ void GameManager::Render()
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
 
-    {
-        PolygonModeGuard polygonMode(m_WireframeMode ? GL_LINE : GL_FILL);
-        RenderScene(mainLightDirection);
-    }
+    RenderScene(mainLightDirection);
 
     if (m_PostProcessRenderer)
     {
@@ -394,10 +391,24 @@ void GameManager::RenderScene(const glm::vec3& mainLightDirection)
         view = m_ScreenShake->GetViewMatrix(view);
 
     const MapConfig& currentMap = m_MapManager->GetCurrentMap();
-    if (currentMap.Terrain == TerrainType::Heightmap && m_Terrain && m_Terrain->IsInitialized())
     {
-        m_TerrainRenderer.RenderHeightmap(*m_Terrain,
-                                          m_MapManager->GetCurrentFloorTextureName(),
+        PolygonModeGuard worldPolygonMode(m_WireframeMode ? GL_LINE : GL_FILL);
+
+        if (currentMap.Terrain == TerrainType::Heightmap && m_Terrain && m_Terrain->IsInitialized())
+        {
+            m_TerrainRenderer.RenderHeightmap(*m_Terrain,
+                                              m_MapManager->GetCurrentFloorTextureName(),
+                                              m_MapManager->GetCurrentAmbientLight(),
+                                              m_Camera.Position,
+                                              projection,
+                                              view,
+                                              m_MapManager->GetCurrentLighting(),
+                                              mainLightDirection,
+                                              m_ShadowMapper.get());
+        }
+        else
+        {
+            m_TerrainRenderer.RenderPlane(m_MapManager->GetCurrentFloorTextureName(),
                                           m_MapManager->GetCurrentAmbientLight(),
                                           m_Camera.Position,
                                           projection,
@@ -405,44 +416,35 @@ void GameManager::RenderScene(const glm::vec3& mainLightDirection)
                                           m_MapManager->GetCurrentLighting(),
                                           mainLightDirection,
                                           m_ShadowMapper.get());
-    }
-    else
-    {
-        m_TerrainRenderer.RenderPlane(m_MapManager->GetCurrentFloorTextureName(),
-                                      m_MapManager->GetCurrentAmbientLight(),
-                                      m_Camera.Position,
-                                      projection,
-                                      view,
-                                      m_MapManager->GetCurrentLighting(),
-                                      mainLightDirection,
-                                      m_ShadowMapper.get());
-    }
-
-    if (m_EcologySystem && m_EcologySystem->IsReady())
-    {
-        ResourceManager& rm = ResourceManager::GetInstance();
-        Shader* ecologyShader = rm.GetShader("sphere");
-        if (ecologyShader)
-        {
-            m_EcologySystem->Render(m_Camera, *ecologyShader, projection, view, m_MapManager->GetCurrentAmbientLight());
         }
-    }
 
-    m_PBRPropRenderer.Render(currentMap,
-                             m_PropModels,
-                             m_Terrain.get(),
-                             m_Camera,
-                             projection,
-                             view,
-                             mainLightDirection,
-                             m_ShadowMapper.get());
+        if (m_EcologySystem && m_EcologySystem->IsReady())
+        {
+            ResourceManager& rm = ResourceManager::GetInstance();
+            Shader* ecologyShader = rm.GetShader("sphere");
+            if (ecologyShader)
+            {
+                m_EcologySystem->Render(m_Camera, *ecologyShader, projection, view, m_MapManager->GetCurrentAmbientLight());
+            }
+        }
+
+        m_PBRPropRenderer.Render(currentMap,
+                                 m_PropModels,
+                                 m_Terrain.get(),
+                                 m_Camera,
+                                 projection,
+                                 view,
+                                 mainLightDirection,
+                                 m_ShadowMapper.get());
+
+        m_TargetRenderer.Render(m_TargetManager.get(),
+                                m_Camera,
+                                m_MapManager->GetCurrentAmbientLight(),
+                                projection,
+                                view);
+    }
 
     m_SkyboxRenderer.Render(currentMap, projection, m_Camera.GetViewMatrix(), m_SkyboxRotation);
-    m_TargetRenderer.Render(m_TargetManager.get(),
-                            m_Camera,
-                            m_MapManager->GetCurrentAmbientLight(),
-                            projection,
-                            view);
     m_ParticleRenderer.Render(m_ParticleSystem.get(), projection, view);
     m_WeaponViewRenderer.Render(m_Weapon.get(), m_Camera, m_ScreenWidth, m_ScreenHeight);
 }
@@ -673,4 +675,3 @@ void GameManager::ResetGameState()
     if (m_HitFeedback)
         m_HitFeedback->Clear();
 }
-
