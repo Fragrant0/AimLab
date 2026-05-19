@@ -5,6 +5,7 @@
 #include <cmath>
 #include <ctime>
 #include <iostream>
+#include <memory>
 
 const float TargetManager::SPAWN_INTERVAL = 2.0f;
 
@@ -34,10 +35,6 @@ TargetManager::TargetManager()
 
 TargetManager::~TargetManager()
 {
-    for (auto* target : m_TargetPool)
-    {
-        delete target;
-    }
     m_TargetPool.clear();
 }
 
@@ -45,8 +42,7 @@ void TargetManager::Initialize()
 {
     for (int i = 0; i < MAX_TARGETS; ++i)
     {
-        TargetSphere* target = new TargetSphere();
-        m_TargetPool.push_back(target);
+        m_TargetPool.push_back(std::make_unique<TargetSphere>());
     }
 }
 
@@ -57,7 +53,7 @@ void TargetManager::Update(float deltaTime, const Camera& camera, const Terrain*
         SpawnTargetRandom(camera, terrain);
     }
 
-    for (auto* target : m_TargetPool)
+    for (const auto& target : m_TargetPool)
     {
         if (target && !target->IsFullyDead())
         {
@@ -68,7 +64,7 @@ void TargetManager::Update(float deltaTime, const Camera& camera, const Terrain*
 
 void TargetManager::Render(Shader& shader, const glm::mat4& projection, const glm::mat4& view)
 {
-    for (auto* target : m_TargetPool)
+    for (const auto& target : m_TargetPool)
     {
         if (target && !target->IsFullyDead())
         {
@@ -104,7 +100,7 @@ void TargetManager::DeactivateTarget(int index)
 int TargetManager::GetActiveTargetCount() const
 {
     int count = 0;
-    for (auto* target : m_TargetPool)
+    for (const auto& target : m_TargetPool)
     {
         if (target && target->IsActive())
             ++count;
@@ -116,7 +112,7 @@ TargetSphere* TargetManager::GetTarget(int index)
 {
     if (index >= 0 && index < static_cast<int>(m_TargetPool.size()))
     {
-        return m_TargetPool[index];
+        return m_TargetPool[index].get();
     }
     return nullptr;
 }
@@ -216,7 +212,7 @@ int TargetManager::FindInactiveTarget()
 int TargetManager::GetLiveTargetCount() const
 {
     int count = 0;
-    for (auto* target : m_TargetPool)
+    for (const auto& target : m_TargetPool)
     {
         if (target && !target->IsFullyDead())
             ++count;
@@ -234,7 +230,7 @@ float TargetManager::GetCenteredOffset(float halfExtent)
 
 bool TargetManager::HasEnoughSpacing(const glm::vec3& position, float radius) const
 {
-    for (auto* target : m_TargetPool)
+    for (const auto& target : m_TargetPool)
     {
         if (!target || target->IsFullyDead())
             continue;

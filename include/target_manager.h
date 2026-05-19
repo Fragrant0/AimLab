@@ -6,6 +6,7 @@
 
 #include <vector>
 #include <random>
+#include <memory>
 
 #include "target_sphere.h"
 #include "shader.h"
@@ -35,7 +36,7 @@ public:
     void SetTargetWall(float distance, float width, float height, float centerY, float lifetime);
 
 private:
-    std::vector<TargetSphere*> m_TargetPool;
+    std::vector<std::unique_ptr<TargetSphere>> m_TargetPool;
 
     float m_SpawnTimer;
     float m_SpawnInterval;
