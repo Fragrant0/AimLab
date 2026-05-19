@@ -34,9 +34,7 @@ TargetManager::TargetManager()
 }
 
 TargetManager::~TargetManager()
-{
-    m_TargetPool.clear();
-}
+= default;
 
 void TargetManager::Initialize()
 {

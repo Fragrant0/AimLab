@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <memory>
 
 const float TargetSphere::SHRINK_DURATION = 0.1f;
 
@@ -12,19 +13,11 @@ TargetSphere::TargetSphere()
       m_Radius(0.5f),
       m_Lifetime(0.0f),
       m_MaxLifetime(5.0f),
-      m_ShrinkTimer(0.0f),
-      m_Mesh(nullptr)
+      m_ShrinkTimer(0.0f)
 {
 }
 
-TargetSphere::~TargetSphere()
-{
-    if (m_Mesh)
-    {
-        delete m_Mesh;
-        m_Mesh = nullptr;
-    }
-}
+TargetSphere::~TargetSphere() = default;
 
 void TargetSphere::Update(float deltaTime)
 {
@@ -93,7 +86,7 @@ void TargetSphere::Activate(float radius, const glm::vec3& position, const glm::
 
     if (!m_Mesh)
     {
-        m_Mesh = new SphereMesh(radius, 36, 18);
+        m_Mesh = std::make_unique<SphereMesh>(radius, 36, 18);
     }
 }
 

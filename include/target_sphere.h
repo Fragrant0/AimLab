@@ -5,6 +5,8 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <memory>
+
 #include "shader.h"
 #include "sphere_mesh.h"
 
@@ -50,7 +52,7 @@ private:
     float m_MaxLifetime;
     float m_ShrinkTimer;
 
-    SphereMesh* m_Mesh;
+    std::unique_ptr<SphereMesh> m_Mesh;
 };
 
 #endif
