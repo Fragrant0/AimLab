@@ -25,10 +25,10 @@ namespace UILayout
     constexpr float HINT_TOP_OFFSET = 5.0f;
     constexpr int SCORE_RESERVED_DIGITS = 2;
 
-    constexpr float SCORE_FONT_SCALE = 2.15f;
-    constexpr float COMBO_FONT_SCALE = 1.75f;
-    constexpr float HINT_FONT_SCALE = 1.1f;
-    constexpr float BEST_FONT_SCALE = 1.2f;
+    constexpr float SCORE_FONT_SCALE = 0.92f;
+    constexpr float COMBO_FONT_SCALE = 0.74f;
+    constexpr float HINT_FONT_SCALE = 0.42f;
+    constexpr float BEST_FONT_SCALE = 0.58f;
 
     constexpr float COMBO_BAR_WIDTH = 100.0f;
     constexpr float COMBO_BAR_HEIGHT = 3.0f;
@@ -40,10 +40,10 @@ namespace UILayout
     constexpr float CROSSHAIR_GAP = 4.0f;
     constexpr float CROSSHAIR_THICKNESS = 2.0f;
 
-    constexpr float DEBUG_PANEL_WIDTH = 280.0f;
-    constexpr float DEBUG_PANEL_HEIGHT = 108.0f;
+    constexpr float DEBUG_PANEL_WIDTH = 300.0f;
+    constexpr float DEBUG_PANEL_HEIGHT = 128.0f;
     constexpr float DEBUG_PANEL_PADDING = 6.0f;
-    constexpr float DEBUG_FONT_SCALE = 0.16f;
+    constexpr float DEBUG_FONT_SCALE = 0.25f;
     constexpr float DEBUG_ROW_GAP = 1.0f;
 }
 

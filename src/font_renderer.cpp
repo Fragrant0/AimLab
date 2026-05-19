@@ -117,11 +117,11 @@ void FontRenderer::SetScreenSize(int screenWidth, int screenHeight)
 void FontRenderer::DrawText(float x, float y, float scale, const std::string& text,
                              const glm::vec3& color, float alpha)
 {
-    if (!m_Initialized || text.empty())
+    if (!m_Initialized || text.empty() || scale <= 0.0f)
         return;
 
-    float currentX = x;
-    float currentY = static_cast<float>(m_ScreenHeight) - y;
+    float currentX = x / scale;
+    float currentY = (static_cast<float>(m_ScreenHeight) - y) / scale;
 
     for (char c : text)
     {
@@ -133,16 +133,18 @@ void FontRenderer::DrawText(float x, float y, float scale, const std::string& te
 
             if (m_VertexCount + 6 <= MAX_VERTICES)
             {
-                float y0 = static_cast<float>(m_ScreenHeight) - q.y0;
-                float y1 = static_cast<float>(m_ScreenHeight) - q.y1;
+                float x0 = q.x0 * scale;
+                float x1 = q.x1 * scale;
+                float y0 = static_cast<float>(m_ScreenHeight) - q.y0 * scale;
+                float y1 = static_cast<float>(m_ScreenHeight) - q.y1 * scale;
 
                 TextVertex* v = &m_VertexBuffer[m_VertexCount];
-                v[0] = { q.x0, y0, q.s0, q.t0, color.r, color.g, color.b, alpha };
-                v[1] = { q.x1, y0, q.s1, q.t0, color.r, color.g, color.b, alpha };
-                v[2] = { q.x1, y1, q.s1, q.t1, color.r, color.g, color.b, alpha };
-                v[3] = { q.x0, y0, q.s0, q.t0, color.r, color.g, color.b, alpha };
-                v[4] = { q.x1, y1, q.s1, q.t1, color.r, color.g, color.b, alpha };
-                v[5] = { q.x0, y1, q.s0, q.t1, color.r, color.g, color.b, alpha };
+                v[0] = { x0, y0, q.s0, q.t0, color.r, color.g, color.b, alpha };
+                v[1] = { x1, y0, q.s1, q.t0, color.r, color.g, color.b, alpha };
+                v[2] = { x1, y1, q.s1, q.t1, color.r, color.g, color.b, alpha };
+                v[3] = { x0, y0, q.s0, q.t0, color.r, color.g, color.b, alpha };
+                v[4] = { x1, y1, q.s1, q.t1, color.r, color.g, color.b, alpha };
+                v[5] = { x0, y1, q.s0, q.t1, color.r, color.g, color.b, alpha };
                 m_VertexCount += 6;
             }
         }
