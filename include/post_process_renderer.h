@@ -3,6 +3,8 @@
 
 #include <glad/glad.h>
 
+#include <memory>
+
 #include "lighting.h"
 #include "shader.h"
 
@@ -32,7 +34,7 @@ private:
     unsigned int m_SceneDepthRBO;
     unsigned int m_QuadVAO;
     unsigned int m_QuadVBO;
-    Shader* m_Shader;
+    std::unique_ptr<Shader> m_Shader;
     bool m_Initialized;
 };
 

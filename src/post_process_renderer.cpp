@@ -1,6 +1,7 @@
 #include "post_process_renderer.h"
 
 #include <iostream>
+#include <memory>
 
 PostProcessRenderer::PostProcessRenderer()
     : m_Width(1),
@@ -10,7 +11,6 @@ PostProcessRenderer::PostProcessRenderer()
       m_SceneDepthRBO(0),
       m_QuadVAO(0),
       m_QuadVBO(0),
-      m_Shader(nullptr),
       m_Initialized(false)
 {
 }
@@ -28,7 +28,7 @@ bool PostProcessRenderer::Initialize(int width, int height)
     m_Width = width;
     m_Height = height;
 
-    m_Shader = new Shader("shaders/post_process.vs", "shaders/post_process.fs");
+    m_Shader = std::make_unique<Shader>("shaders/post_process.vs", "shaders/post_process.fs");
     CreateSceneTargets();
     CreateQuad();
 
@@ -42,8 +42,7 @@ void PostProcessRenderer::Cleanup()
 
     if (m_QuadVAO) { glDeleteVertexArrays(1, &m_QuadVAO); m_QuadVAO = 0; }
     if (m_QuadVBO) { glDeleteBuffers(1, &m_QuadVBO); m_QuadVBO = 0; }
-    delete m_Shader;
-    m_Shader = nullptr;
+    m_Shader.reset();
     m_Initialized = false;
 }
 
