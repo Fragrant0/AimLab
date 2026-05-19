@@ -69,11 +69,7 @@ private:
     void SetupEcology();
     void LoadMapResources();
     void UnloadMapResources(int mapIndex);
-    void RenderScene();
-    void RenderSkybox(glm::mat4 projection, glm::mat4 view);
-    void RenderTerrain(glm::mat4 projection, glm::mat4 view);
-    void RenderPlane(glm::mat4 projection, glm::mat4 view);
-    void RenderProps(glm::mat4 projection, glm::mat4 view);
+    void RenderScene(const glm::vec3& mainLightDirection);
     void RenderTargets(glm::mat4 projection, glm::mat4 view);
     void RenderParticles(glm::mat4 projection, glm::mat4 view);
     void RenderWeapon(glm::mat4 projection, glm::mat4 view);

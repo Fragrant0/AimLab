@@ -387,7 +387,7 @@ void GameManager::Render()
 
     {
         PolygonModeGuard polygonMode(m_WireframeMode ? GL_LINE : GL_FILL);
-        RenderScene();
+        RenderScene(mainLightDirection);
     }
 
     if (m_PostProcessRenderer)
@@ -432,7 +432,7 @@ void GameManager::RenderShadowMap(const glm::vec3& mainLightDirection)
                                 mainLightDirection);
 }
 
-void GameManager::RenderScene()
+void GameManager::RenderScene(const glm::vec3& mainLightDirection)
 {
     glm::mat4 projection = glm::perspective(glm::radians(m_Camera.Zoom), (float)m_ScreenWidth / (float)m_ScreenHeight, 0.1f, 100.0f);
     glm::mat4 view = m_Camera.GetViewMatrix();
@@ -442,9 +442,28 @@ void GameManager::RenderScene()
 
     const MapConfig& currentMap = m_MapManager->GetCurrentMap();
     if (currentMap.Terrain == TerrainType::Heightmap && m_Terrain && m_Terrain->IsInitialized())
-        RenderTerrain(projection, view);
+    {
+        m_TerrainRenderer.RenderHeightmap(*m_Terrain,
+                                          m_MapManager->GetCurrentFloorTextureName(),
+                                          m_MapManager->GetCurrentAmbientLight(),
+                                          m_Camera.Position,
+                                          projection,
+                                          view,
+                                          m_MapManager->GetCurrentLighting(),
+                                          mainLightDirection,
+                                          m_ShadowMapper.get());
+    }
     else
-        RenderPlane(projection, view);
+    {
+        m_TerrainRenderer.RenderPlane(m_MapManager->GetCurrentFloorTextureName(),
+                                      m_MapManager->GetCurrentAmbientLight(),
+                                      m_Camera.Position,
+                                      projection,
+                                      view,
+                                      m_MapManager->GetCurrentLighting(),
+                                      mainLightDirection,
+                                      m_ShadowMapper.get());
+    }
 
     if (m_EcologySystem && m_EcologySystem->IsReady())
     {
@@ -456,57 +475,19 @@ void GameManager::RenderScene()
         }
     }
 
-    RenderProps(projection, view);
-    RenderSkybox(projection, view);
-    RenderTargets(projection, view);
-    RenderParticles(projection, view);
-    RenderWeapon(projection, view);
-}
-
-void GameManager::RenderTerrain(glm::mat4 projection, glm::mat4 view)
-{
-    if (!m_Terrain || !m_Terrain->IsInitialized())
-        return;
-
-    m_TerrainRenderer.RenderHeightmap(*m_Terrain,
-                                      m_MapManager->GetCurrentFloorTextureName(),
-                                      m_MapManager->GetCurrentAmbientLight(),
-                                      m_Camera.Position,
-                                      projection,
-                                      view,
-                                      m_MapManager->GetCurrentLighting(),
-                                      GetRotatedMainLightDirection(),
-                                      m_ShadowMapper.get());
-}
-
-void GameManager::RenderPlane(glm::mat4 projection, glm::mat4 view)
-{
-    m_TerrainRenderer.RenderPlane(m_MapManager->GetCurrentFloorTextureName(),
-                                  m_MapManager->GetCurrentAmbientLight(),
-                                  m_Camera.Position,
-                                  projection,
-                                  view,
-                                  m_MapManager->GetCurrentLighting(),
-                                  GetRotatedMainLightDirection(),
-                                  m_ShadowMapper.get());
-}
-
-void GameManager::RenderProps(glm::mat4 projection, glm::mat4 view)
-{
-    m_PBRPropRenderer.Render(m_MapManager->GetCurrentMap(),
+    m_PBRPropRenderer.Render(currentMap,
                              m_PropModels,
                              m_Terrain.get(),
                              m_Camera,
                              projection,
                              view,
-                             GetRotatedMainLightDirection(),
+                             mainLightDirection,
                              m_ShadowMapper.get());
-}
 
-void GameManager::RenderSkybox(glm::mat4 projection, glm::mat4 view)
-{
-    (void)view;
-    m_SkyboxRenderer.Render(m_MapManager->GetCurrentMap(), projection, m_Camera.GetViewMatrix(), m_SkyboxRotation);
+    m_SkyboxRenderer.Render(currentMap, projection, m_Camera.GetViewMatrix(), m_SkyboxRotation);
+    RenderTargets(projection, view);
+    RenderParticles(projection, view);
+    RenderWeapon(projection, view);
 }
 
 void GameManager::RenderTargets(glm::mat4 projection, glm::mat4 view)
