@@ -69,6 +69,9 @@
     <ClCompile Include="src\weapon.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="src\weapon_view_renderer.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
     <ClCompile Include="src\map_manager.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
@@ -205,6 +208,9 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="include\weapon.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\weapon_view_renderer.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="include\map_manager.h">

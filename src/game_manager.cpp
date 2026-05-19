@@ -440,7 +440,7 @@ void GameManager::RenderScene(const glm::vec3& mainLightDirection)
     m_SkyboxRenderer.Render(currentMap, projection, m_Camera.GetViewMatrix(), m_SkyboxRotation);
     RenderTargets(projection, view);
     RenderParticles(projection, view);
-    RenderWeapon(projection, view);
+    m_WeaponViewRenderer.Render(m_Weapon.get(), m_Camera, m_ScreenWidth, m_ScreenHeight);
 }
 
 void GameManager::RenderTargets(glm::mat4 projection, glm::mat4 view)
@@ -486,26 +486,6 @@ void GameManager::RenderParticles(glm::mat4 projection, glm::mat4 view)
     if (!particleShader) return;
 
     m_ParticleSystem->Render(*particleShader, projection, view);
-}
-
-void GameManager::RenderWeapon(glm::mat4 projection, glm::mat4 view)
-{
-    if (!m_Weapon)
-        return;
-
-    ResourceManager& rm = ResourceManager::GetInstance();
-    Shader* weaponShader = rm.GetShader("weapon");
-    Shader* flashShader = rm.GetShader("muzzle_flash");
-    if (!weaponShader) return;
-
-    GLint prevDepthFunc;
-    glGetIntegerv(GL_DEPTH_FUNC, &prevDepthFunc);
-    glClear(GL_DEPTH_BUFFER_BIT);
-
-    float currentTime = static_cast<float>(glfwGetTime());
-    m_Weapon->Render(*weaponShader, flashShader, m_Camera, m_ScreenWidth, m_ScreenHeight, currentTime);
-
-    glDepthFunc(prevDepthFunc);
 }
 
 void GameManager::Cleanup()

@@ -23,6 +23,7 @@
 #include "pbr_prop_renderer.h"
 #include "skybox_renderer.h"
 #include "weapon.h"
+#include "weapon_view_renderer.h"
 #include "map_manager.h"
 #include "map_resource_loader.h"
 #include "ui_renderer.h"
@@ -73,7 +74,6 @@ private:
     void RenderScene(const glm::vec3& mainLightDirection);
     void RenderTargets(glm::mat4 projection, glm::mat4 view);
     void RenderParticles(glm::mat4 projection, glm::mat4 view);
-    void RenderWeapon(glm::mat4 projection, glm::mat4 view);
     void RenderShadowMap(const glm::vec3& mainLightDirection);
     void Shoot();
     void SwitchMap(int mapIndex);
@@ -101,6 +101,7 @@ private:
     TerrainRenderer m_TerrainRenderer;
     ShadowPassRenderer m_ShadowPassRenderer;
     HudRenderer m_HudRenderer;
+    WeaponViewRenderer m_WeaponViewRenderer;
 
     std::map<std::string, std::unique_ptr<Model>> m_PropModels;
 
