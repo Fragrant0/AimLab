@@ -1,4 +1,5 @@
 #include "weapon.h"
+#include "gl_state_guard.h"
 
 #include <cmath>
 #include <glm/gtc/matrix_transform.hpp>
@@ -206,22 +207,11 @@ void Weapon::RenderMuzzleFlash(Shader& flashShader, const glm::mat4& projection,
                                const glm::mat4& view, const glm::vec3& weaponOffset,
                                float currentTime)
 {
-    GLboolean blendEnabled = glIsEnabled(GL_BLEND);
-    GLboolean depthTestEnabled = glIsEnabled(GL_DEPTH_TEST);
-    GLint blendSrc, blendDst;
-    glGetIntegerv(GL_BLEND_SRC_RGB, &blendSrc);
-    glGetIntegerv(GL_BLEND_DST_RGB, &blendDst);
-    GLint prevDepthFunc;
-    glGetIntegerv(GL_DEPTH_FUNC, &prevDepthFunc);
-    GLboolean depthWriteMask;
-    glGetBooleanv(GL_DEPTH_WRITEMASK, &depthWriteMask);
-
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_ONE, GL_ONE);
-
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LESS);
-    glDepthMask(GL_FALSE);
+    CapabilityGuard blend(GL_BLEND, true);
+    BlendFuncGuard blendFunc(GL_ONE, GL_ONE);
+    CapabilityGuard depthTest(GL_DEPTH_TEST, true);
+    DepthFuncGuard depthFunc(GL_LESS);
+    DepthMaskGuard depthMask(GL_FALSE);
 
     flashShader.use();
     flashShader.setMat4("projection", projection);
@@ -258,13 +248,4 @@ void Weapon::RenderMuzzleFlash(Shader& flashShader, const glm::mat4& projection,
     glDrawElements(GL_TRIANGLES, m_MuzzleIndexCount, GL_UNSIGNED_INT, 0);
     glBindVertexArray(0);
 
-    glDepthMask(depthWriteMask ? GL_TRUE : GL_FALSE);
-    glDepthFunc(prevDepthFunc);
-
-    if (!blendEnabled)
-        glDisable(GL_BLEND);
-    glBlendFunc(blendSrc, blendDst);
-
-    if (!depthTestEnabled)
-        glDisable(GL_DEPTH_TEST);
 }

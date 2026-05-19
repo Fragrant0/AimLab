@@ -1,4 +1,5 @@
 #include "post_process_renderer.h"
+#include "gl_state_guard.h"
 
 #include <iostream>
 #include <memory>
@@ -78,8 +79,8 @@ void PostProcessRenderer::RenderToScreen(float timeSeconds, const PostProcessCon
     if (!m_Shader)
         return;
 
-    glDisable(GL_DEPTH_TEST);
-    glDisable(GL_BLEND);
+    CapabilityGuard depthTest(GL_DEPTH_TEST, false);
+    CapabilityGuard blend(GL_BLEND, false);
 
     m_Shader->use();
     m_Shader->setInt("sceneTexture", 0);
@@ -101,7 +102,6 @@ void PostProcessRenderer::RenderToScreen(float timeSeconds, const PostProcessCon
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     glBindVertexArray(0);
 
-    glEnable(GL_DEPTH_TEST);
 }
 
 void PostProcessRenderer::CreateSceneTargets()

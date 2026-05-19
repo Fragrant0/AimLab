@@ -1,4 +1,5 @@
 #include "particle_system.h"
+#include "gl_state_guard.h"
 
 #include <algorithm>
 #include <cmath>
@@ -109,25 +110,14 @@ void ParticleSystem::Render(Shader& shader, const glm::mat4& projection, const g
     shader.setMat4("projection", projection);
     shader.setMat4("view", view);
 
-    GLboolean blendEnabled = glIsEnabled(GL_BLEND);
-    GLint blendSrc, blendDst;
-    glGetIntegerv(GL_BLEND_SRC_RGB, &blendSrc);
-    glGetIntegerv(GL_BLEND_DST_RGB, &blendDst);
-    GLboolean depthWriteEnabled;
-    glGetBooleanv(GL_DEPTH_WRITEMASK, &depthWriteEnabled);
-
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE);
-    glDepthMask(GL_FALSE);
+    CapabilityGuard blend(GL_BLEND, true);
+    BlendFuncGuard blendFunc(GL_SRC_ALPHA, GL_ONE);
+    DepthMaskGuard depthMask(GL_FALSE);
 
     glBindVertexArray(m_VAO);
     glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, 4, m_ActiveCount);
     glBindVertexArray(0);
 
-    glDepthMask(depthWriteEnabled ? GL_TRUE : GL_FALSE);
-    if (!blendEnabled)
-        glDisable(GL_BLEND);
-    glBlendFunc(blendSrc, blendDst);
 }
 
 void ParticleSystem::Cleanup()

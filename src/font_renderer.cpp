@@ -1,4 +1,5 @@
 #include "font_renderer.h"
+#include "gl_state_guard.h"
 
 #define STB_TRUETYPE_IMPLEMENTATION
 #include <stb_truetype.h>
@@ -153,9 +154,9 @@ void FontRenderer::Flush()
     if (!m_Initialized || m_VertexCount == 0)
         return;
 
-    glDisable(GL_DEPTH_TEST);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    CapabilityGuard depthTest(GL_DEPTH_TEST, false);
+    CapabilityGuard blend(GL_BLEND, true);
+    BlendFuncGuard blendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     m_Shader->use();
     m_Shader->setMat4("projection", m_Projection);
@@ -170,9 +171,6 @@ void FontRenderer::Flush()
     glBindVertexArray(m_VAO);
     glDrawArrays(GL_TRIANGLES, 0, m_VertexCount);
     glBindVertexArray(0);
-
-    glDisable(GL_BLEND);
-    glEnable(GL_DEPTH_TEST);
 
     m_VertexCount = 0;
 }
