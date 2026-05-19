@@ -40,12 +40,11 @@ namespace UILayout
     constexpr float CROSSHAIR_GAP = 4.0f;
     constexpr float CROSSHAIR_THICKNESS = 2.0f;
 
-    constexpr float DEBUG_PANEL_WIDTH = 520.0f;
-    constexpr float DEBUG_PANEL_HEIGHT = 360.0f;
-    constexpr float DEBUG_PANEL_OFFSET_Y = 282.0f;
-    constexpr float DEBUG_PANEL_PADDING = 14.0f;
-    constexpr float DEBUG_FONT_SCALE = 0.42f;
-    constexpr float DEBUG_ROW_GAP = 4.0f;
+    constexpr float DEBUG_PANEL_WIDTH = 280.0f;
+    constexpr float DEBUG_PANEL_HEIGHT = 108.0f;
+    constexpr float DEBUG_PANEL_PADDING = 6.0f;
+    constexpr float DEBUG_FONT_SCALE = 0.16f;
+    constexpr float DEBUG_ROW_GAP = 1.0f;
 }
 
 namespace
@@ -79,13 +78,13 @@ namespace
     {
         switch (index)
         {
-        case 0: return "Exposure";
-        case 1: return "Bloom Intensity";
-        case 2: return "Bloom Threshold";
-        case 3: return "Bloom Radius";
-        case 4: return "Contrast";
-        case 5: return "Saturation";
-        default: return "Unknown";
+        case 0: return "EXP";
+        case 1: return "BLM";
+        case 2: return "THR";
+        case 3: return "RAD";
+        case 4: return "CON";
+        case 5: return "SAT";
+        default: return "UNK";
         }
     }
 
@@ -96,11 +95,25 @@ namespace
         return stream.str();
     }
 
+    std::string DebugParamValue(int index, const PostProcessConfig& post)
+    {
+        switch (index)
+        {
+        case 0: return FormatFloat(post.Exposure);
+        case 1: return FormatFloat(post.Bloom.Intensity);
+        case 2: return FormatFloat(post.Bloom.Threshold);
+        case 3: return FormatFloat(post.Bloom.Radius);
+        case 4: return FormatFloat(post.Contrast);
+        case 5: return FormatFloat(post.Saturation);
+        default: return "--";
+        }
+    }
+
     std::string FormatVec3(const glm::vec3& value)
     {
         std::ostringstream stream;
         stream << std::fixed << std::setprecision(2)
-               << value.x << ", " << value.y << ", " << value.z;
+               << value.x << "," << value.y << "," << value.z;
         return stream.str();
     }
 
@@ -333,18 +346,16 @@ void HudRenderer::RenderDebugOverlay(UIRenderer& uiRenderer,
                                      float uiScale)
 {
     const float w = static_cast<float>(screenWidth);
-    const float h = static_cast<float>(screenHeight);
     const float margin = UIUtils::ScaleToScreen(UILayout::HINT_MARGIN, uiScale);
     const float panelWidth = std::min(UIUtils::ScaleToScreen(UILayout::DEBUG_PANEL_WIDTH, uiScale),
                                       std::max(1.0f, w - margin * 2.0f));
     const float panelHeight = UIUtils::ScaleToScreen(UILayout::DEBUG_PANEL_HEIGHT, uiScale);
     const float panelX = margin;
-    const float panelTop = h - margin - UIUtils::ScaleToScreen(UILayout::DEBUG_PANEL_OFFSET_Y, uiScale);
-    const float panelY = std::max(margin, panelTop - panelHeight);
+    const float panelY = margin;
     const float padding = UIUtils::ScaleToScreen(UILayout::DEBUG_PANEL_PADDING, uiScale);
 
     uiRenderer.Begin();
-    uiRenderer.DrawRect(panelX, panelY, panelWidth, panelHeight, glm::vec3(0.02f, 0.025f, 0.03f), 0.76f);
+    uiRenderer.DrawRect(panelX, panelY, panelWidth, panelHeight, glm::vec3(0.02f, 0.025f, 0.03f), 0.58f);
     uiRenderer.DrawRectOutline(panelX, panelY, panelWidth, panelHeight, glm::vec3(0.14f, 0.95f, 0.74f), 1.0f);
     uiRenderer.End();
 
@@ -365,31 +376,20 @@ void HudRenderer::RenderDebugOverlay(UIRenderer& uiRenderer,
     const glm::vec3 mutedColor(0.56f, 0.66f, 0.74f);
     const glm::vec3 selectedColor(1.0f, 0.80f, 0.30f);
 
-    drawLine("DEBUG RENDER", titleColor);
-    drawLine(std::string("F2 PostFX ") + OnOff(state.PostEffectsEnabled) +
-             "   F3 Bloom " + OnOff(state.BloomEnabled) +
-             "   F4 Shadows " + OnOff(state.ShadowsEnabled), textColor);
-    drawLine("TAB Select   Left/Right Adjust   R Reset", mutedColor);
-    drawLine(std::string("Wireframe ") + OnOff(state.WireframeEnabled) +
-             "   Selected: " + DebugParamName(state.SelectedParameter), mutedColor);
-
     const PostProcessConfig& post = state.PostProcess;
-    const std::string values[] = {
-        std::string("Exposure         ") + FormatFloat(post.Exposure),
-        std::string("Bloom Intensity  ") + FormatFloat(post.Bloom.Intensity),
-        std::string("Bloom Threshold  ") + FormatFloat(post.Bloom.Threshold),
-        std::string("Bloom Radius     ") + FormatFloat(post.Bloom.Radius),
-        std::string("Contrast         ") + FormatFloat(post.Contrast),
-        std::string("Saturation       ") + FormatFloat(post.Saturation)
-    };
-
-    for (int i = 0; i < 6; ++i)
-    {
-        const bool selected = i == state.SelectedParameter;
-        drawLine(std::string(selected ? "> " : "  ") + values[i],
-                 selected ? selectedColor : textColor);
-    }
-
-    drawLine(std::string("Light Dir        ") + FormatVec3(state.MainLightDirection), mutedColor);
-    drawLine(std::string("Skybox Rotation  ") + FormatFloat(state.SkyboxRotationDegrees) + " deg", mutedColor);
+    drawLine(std::string("DBG P:") + OnOff(state.PostEffectsEnabled) +
+             " B:" + OnOff(state.BloomEnabled) +
+             " S:" + OnOff(state.ShadowsEnabled), titleColor);
+    drawLine("F1/F2/F3/F4  TAB  <- ->  R", mutedColor);
+    drawLine(std::string("> ") + DebugParamName(state.SelectedParameter) +
+             " " + DebugParamValue(state.SelectedParameter, post), selectedColor);
+    drawLine("EXP " + FormatFloat(post.Exposure) +
+             " BLM " + FormatFloat(post.Bloom.Intensity) +
+             " THR " + FormatFloat(post.Bloom.Threshold), textColor);
+    drawLine("RAD " + FormatFloat(post.Bloom.Radius) +
+             " CON " + FormatFloat(post.Contrast) +
+             " SAT " + FormatFloat(post.Saturation), textColor);
+    drawLine(std::string("W:") + OnOff(state.WireframeEnabled) +
+             " L:" + FormatVec3(state.MainLightDirection), mutedColor);
+    drawLine("SKY " + FormatFloat(state.SkyboxRotationDegrees), mutedColor);
 }
