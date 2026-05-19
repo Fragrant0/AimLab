@@ -3,10 +3,10 @@
 #include <cmath>
 #include <glm/gtc/matrix_transform.hpp>
 #include <algorithm>
+#include <memory>
 
 Weapon::Weapon()
-    : m_GunModel(nullptr),
-      m_MuzzleVAO(0),
+    : m_MuzzleVAO(0),
       m_MuzzleVBO(0),
       m_MuzzleEBO(0),
       m_MuzzleIndexCount(0),
@@ -29,7 +29,7 @@ Weapon::~Weapon()
 
 void Weapon::Initialize()
 {
-    m_GunModel = new Model("resources/objects/gun/gun.obj");
+    m_GunModel = std::make_unique<Model>("resources/objects/gun/gun.obj");
 
     GenerateMuzzleFlashGeometry();
     CreateMuzzleFlashBuffers();
@@ -37,10 +37,7 @@ void Weapon::Initialize()
 
 void Weapon::Cleanup()
 {
-    if (m_GunModel) {
-        delete m_GunModel;
-        m_GunModel = nullptr;
-    }
+    m_GunModel.reset();
 
     if (m_MuzzleVAO != 0) {
         glDeleteVertexArrays(1, &m_MuzzleVAO);

@@ -6,6 +6,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <vector>
 #include <random>
+#include <memory>
 
 #include "shader.h"
 #include "camera.h"
@@ -92,7 +93,7 @@ private:
     float m_ShootCooldown;
     float m_ShootCooldownTimer;
 
-    Model* m_GunModel;
+    std::unique_ptr<Model> m_GunModel;
 
     MuzzleFlashParams m_FlashParams;
 
