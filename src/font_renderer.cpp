@@ -6,9 +6,101 @@
 
 #include <cctype>
 #include <algorithm>
+#include <cstring>
 #include <iostream>
 #include <fstream>
 #include <memory>
+#include <unordered_set>
+
+namespace
+{
+    bool CanReadFile(const std::string& path)
+    {
+        std::ifstream file(path, std::ios::binary);
+        return file.good();
+    }
+
+    std::string SelectUIFontPath(const std::string& requestedPath)
+    {
+        const std::vector<std::string> candidates = {
+            "resources/fonts/msyh.ttc",
+            "resources/fonts/simhei.ttf",
+            "C:/Windows/Fonts/msyh.ttc",
+            "C:/Windows/Fonts/simhei.ttf",
+            "C:/Windows/Fonts/simsun.ttc",
+            requestedPath
+        };
+
+        for (const std::string& path : candidates)
+        {
+            if (!path.empty() && CanReadFile(path))
+                return path;
+        }
+
+        return requestedPath;
+    }
+
+    std::vector<unsigned int> DecodeUTF8(const std::string& text)
+    {
+        std::vector<unsigned int> result;
+        for (size_t i = 0; i < text.size();)
+        {
+            const unsigned char c = static_cast<unsigned char>(text[i]);
+            if (c < 0x80)
+            {
+                result.push_back(c);
+                ++i;
+            }
+            else if ((c & 0xE0) == 0xC0 && i + 1 < text.size())
+            {
+                result.push_back(((c & 0x1F) << 6) |
+                                 (static_cast<unsigned char>(text[i + 1]) & 0x3F));
+                i += 2;
+            }
+            else if ((c & 0xF0) == 0xE0 && i + 2 < text.size())
+            {
+                result.push_back(((c & 0x0F) << 12) |
+                                 ((static_cast<unsigned char>(text[i + 1]) & 0x3F) << 6) |
+                                 (static_cast<unsigned char>(text[i + 2]) & 0x3F));
+                i += 3;
+            }
+            else if ((c & 0xF8) == 0xF0 && i + 3 < text.size())
+            {
+                result.push_back(((c & 0x07) << 18) |
+                                 ((static_cast<unsigned char>(text[i + 1]) & 0x3F) << 12) |
+                                 ((static_cast<unsigned char>(text[i + 2]) & 0x3F) << 6) |
+                                 (static_cast<unsigned char>(text[i + 3]) & 0x3F));
+                i += 4;
+            }
+            else
+            {
+                ++i;
+            }
+        }
+        return result;
+    }
+
+    std::vector<int> BuildGlyphCodepoints()
+    {
+        std::vector<int> codepoints;
+        std::unordered_set<unsigned int> seen;
+        auto add = [&](unsigned int codepoint) {
+            if (seen.insert(codepoint).second)
+                codepoints.push_back(static_cast<int>(codepoint));
+        };
+
+        for (unsigned int c = 32; c <= 126; ++c)
+            add(c);
+
+        const std::string debugText =
+            "调试面板后处理后效泛光阴影线框选择调整重置"
+            "曝光强度阈值半径对比饱和主光方向天空旋转开关左右";
+        for (unsigned int codepoint : DecodeUTF8(debugText))
+            add(codepoint);
+
+        return codepoints;
+    }
+}
 
 FontRenderer::FontRenderer()
     : m_AtlasTexture(0),
@@ -20,7 +112,6 @@ FontRenderer::FontRenderer()
       m_VertexCount(0),
       m_Initialized(false)
 {
-    memset(m_CData, 0, sizeof(m_CData));
     memset(m_VertexBuffer, 0, sizeof(m_VertexBuffer));
 }
 
@@ -37,10 +128,11 @@ bool FontRenderer::Initialize(int screenWidth, int screenHeight, const std::stri
     m_ScreenWidth = screenWidth;
     m_ScreenHeight = screenHeight;
 
-    std::ifstream file(fontPath, std::ios::binary | std::ios::ate);
+    const std::string resolvedFontPath = SelectUIFontPath(fontPath);
+    std::ifstream file(resolvedFontPath, std::ios::binary | std::ios::ate);
     if (!file.is_open())
     {
-        std::cerr << "[FontRenderer] Failed to load font: " << fontPath << std::endl;
+        std::cerr << "[FontRenderer] Failed to load font: " << resolvedFontPath << std::endl;
         return false;
     }
 
@@ -49,18 +141,45 @@ bool FontRenderer::Initialize(int screenWidth, int screenHeight, const std::stri
     std::vector<unsigned char> ttfBuffer(size);
     if (!file.read(reinterpret_cast<char*>(ttfBuffer.data()), size))
     {
-        std::cerr << "[FontRenderer] Failed to read font: " << fontPath << std::endl;
+        std::cerr << "[FontRenderer] Failed to read font: " << resolvedFontPath << std::endl;
         return false;
     }
 
-    unsigned char tempBitmap[ATLAS_W * ATLAS_H];
-    stbtt_BakeFontBitmap(ttfBuffer.data(), 0, 48.0f, tempBitmap,
-                          ATLAS_W, ATLAS_H, FIRST_CHAR, CHAR_COUNT, m_CData);
+    std::vector<unsigned char> tempBitmap(ATLAS_W * ATLAS_H, 0);
+    std::vector<int> codepoints = BuildGlyphCodepoints();
+    std::vector<stbtt_packedchar> packedChars(codepoints.size());
+
+    stbtt_pack_context packContext;
+    if (!stbtt_PackBegin(&packContext, tempBitmap.data(), ATLAS_W, ATLAS_H, 0, 1, nullptr))
+    {
+        std::cerr << "[FontRenderer] Failed to create font atlas." << std::endl;
+        return false;
+    }
+    stbtt_PackSetOversampling(&packContext, 2, 2);
+    stbtt_PackSetSkipMissingCodepoints(&packContext, 1);
+
+    stbtt_pack_range range = {};
+    range.font_size = 48.0f;
+    range.array_of_unicode_codepoints = codepoints.data();
+    range.num_chars = static_cast<int>(codepoints.size());
+    range.chardata_for_range = packedChars.data();
+
+    const int packed = stbtt_PackFontRanges(&packContext, ttfBuffer.data(), 0, &range, 1);
+    stbtt_PackEnd(&packContext);
+    if (!packed)
+        std::cerr << "[FontRenderer] Font atlas did not pack every requested glyph." << std::endl;
+
+    m_Glyphs.clear();
+    for (size_t i = 0; i < codepoints.size(); ++i)
+    {
+        if (packedChars[i].x1 > packedChars[i].x0 || codepoints[i] == 32)
+            m_Glyphs[static_cast<unsigned int>(codepoints[i])] = packedChars[i];
+    }
 
     glGenTextures(1, &m_AtlasTexture);
     glBindTexture(GL_TEXTURE_2D, m_AtlasTexture);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, ATLAS_W, ATLAS_H, 0,
-                 GL_RED, GL_UNSIGNED_BYTE, tempBitmap);
+                 GL_RED, GL_UNSIGNED_BYTE, tempBitmap.data());
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glBindTexture(GL_TEXTURE_2D, 0);
@@ -88,7 +207,8 @@ bool FontRenderer::Initialize(int screenWidth, int screenHeight, const std::stri
                                -1.0f, 1.0f);
 
     m_Initialized = true;
-    std::cout << "[FontRenderer] Initialized with font: " << fontPath << std::endl;
+    std::cout << "[FontRenderer] Initialized with font: " << resolvedFontPath
+              << " | glyphs: " << m_Glyphs.size() << std::endl;
     return true;
 }
 
@@ -100,6 +220,7 @@ void FontRenderer::Cleanup()
     if (m_AtlasTexture) { glDeleteTextures(1, &m_AtlasTexture); m_AtlasTexture = 0; }
     if (m_VAO) { glDeleteVertexArrays(1, &m_VAO); m_VAO = 0; }
     if (m_VBO) { glDeleteBuffers(1, &m_VBO); m_VBO = 0; }
+    m_Glyphs.clear();
     m_Shader.reset();
 
     m_Initialized = false;
@@ -123,13 +244,14 @@ void FontRenderer::DrawText(float x, float y, float scale, const std::string& te
     float currentX = x / scale;
     float currentY = (static_cast<float>(m_ScreenHeight) - y) / scale;
 
-    for (char c : text)
+    for (unsigned int codepoint : DecodeUTF8(text))
     {
-        if (c >= FIRST_CHAR && c < FIRST_CHAR + CHAR_COUNT)
+        auto glyphIt = m_Glyphs.find(codepoint);
+        if (glyphIt != m_Glyphs.end())
         {
             stbtt_aligned_quad q;
-            stbtt_GetBakedQuad(m_CData, ATLAS_W, ATLAS_H, c - FIRST_CHAR,
-                               &currentX, &currentY, &q, 1);
+            stbtt_GetPackedQuad(&glyphIt->second, ATLAS_W, ATLAS_H, 0,
+                                &currentX, &currentY, &q, 1);
 
             if (m_VertexCount + 6 <= MAX_VERTICES)
             {
@@ -183,12 +305,11 @@ float FontRenderer::GetTextWidth(float scale, const std::string& text) const
         return 0.0f;
 
     float width = 0.0f;
-    for (char c : text)
+    for (unsigned int codepoint : DecodeUTF8(text))
     {
-        if (c >= FIRST_CHAR && c < FIRST_CHAR + CHAR_COUNT)
-        {
-            width += m_CData[c - FIRST_CHAR].xadvance * scale;
-        }
+        auto glyphIt = m_Glyphs.find(codepoint);
+        if (glyphIt != m_Glyphs.end())
+            width += glyphIt->second.xadvance * scale;
     }
     return width;
 }

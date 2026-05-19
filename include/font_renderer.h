@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <unordered_map>
 
 #include "shader.h"
 #include <stb_truetype.h>
@@ -33,12 +34,10 @@ public:
     glm::mat4 GetProjection() const { return m_Projection; }
 
 private:
-    static const int ATLAS_W = 512;
-    static const int ATLAS_H = 512;
-    static const int FIRST_CHAR = 32;
-    static const int CHAR_COUNT = 96;
+    static const int ATLAS_W = 1024;
+    static const int ATLAS_H = 1024;
 
-    stbtt_bakedchar m_CData[CHAR_COUNT];
+    std::unordered_map<unsigned int, stbtt_packedchar> m_Glyphs;
 
     unsigned int m_AtlasTexture;
     unsigned int m_VAO;

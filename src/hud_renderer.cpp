@@ -40,10 +40,10 @@ namespace UILayout
     constexpr float CROSSHAIR_GAP = 4.0f;
     constexpr float CROSSHAIR_THICKNESS = 2.0f;
 
-    constexpr float DEBUG_PANEL_WIDTH = 360.0f;
-    constexpr float DEBUG_PANEL_HEIGHT = 150.0f;
+    constexpr float DEBUG_PANEL_WIDTH = 540.0f;
+    constexpr float DEBUG_PANEL_HEIGHT = 225.0f;
     constexpr float DEBUG_PANEL_PADDING = 6.0f;
-    constexpr float DEBUG_FONT_SCALE = 0.30f;
+    constexpr float DEBUG_FONT_SCALE = 0.45f;
     constexpr float DEBUG_ROW_GAP = 1.0f;
 }
 
@@ -78,13 +78,13 @@ namespace
     {
         switch (index)
         {
-        case 0: return "EXP";
-        case 1: return "BLM";
-        case 2: return "THR";
-        case 3: return "RAD";
-        case 4: return "CON";
-        case 5: return "SAT";
-        default: return "UNK";
+        case 0: return "曝光";
+        case 1: return "泛光强度";
+        case 2: return "泛光阈值";
+        case 3: return "泛光半径";
+        case 4: return "对比";
+        case 5: return "饱和";
+        default: return "--";
         }
     }
 
@@ -119,7 +119,7 @@ namespace
 
     const char* OnOff(bool enabled)
     {
-        return enabled ? "ON" : "OFF";
+        return enabled ? "开" : "关";
     }
 }
 
@@ -376,19 +376,20 @@ void HudRenderer::RenderDebugOverlay(UIRenderer& uiRenderer,
     const glm::vec3 selectedColor(1.0f, 0.80f, 0.30f);
 
     const PostProcessConfig& post = state.PostProcess;
-    drawLine(std::string("DBG P:") + OnOff(state.PostEffectsEnabled) +
-             " B:" + OnOff(state.BloomEnabled) +
-             " S:" + OnOff(state.ShadowsEnabled), titleColor);
-    drawLine("F1/F2/F3/F4  TAB  <- ->  R", mutedColor);
+    drawLine(std::string("调试  后效:") + OnOff(state.PostEffectsEnabled) +
+             "  泛光:" + OnOff(state.BloomEnabled) +
+             "  阴影:" + OnOff(state.ShadowsEnabled), titleColor);
+    drawLine("F1面板 F2后效 F3泛光 F4阴影", mutedColor);
+    drawLine("TAB选择  左右调整  R重置", mutedColor);
     drawLine(std::string("> ") + DebugParamName(state.SelectedParameter) +
              " " + DebugParamValue(state.SelectedParameter, post), selectedColor);
-    drawLine("EXP " + FormatFloat(post.Exposure) +
-             " BLM " + FormatFloat(post.Bloom.Intensity) +
-             " THR " + FormatFloat(post.Bloom.Threshold), textColor);
-    drawLine("RAD " + FormatFloat(post.Bloom.Radius) +
-             " CON " + FormatFloat(post.Contrast) +
-             " SAT " + FormatFloat(post.Saturation), textColor);
-    drawLine(std::string("W:") + OnOff(state.WireframeEnabled) +
-             " L:" + FormatVec3(state.MainLightDirection), mutedColor);
-    drawLine("SKY " + FormatFloat(state.SkyboxRotationDegrees), mutedColor);
+    drawLine("曝光 " + FormatFloat(post.Exposure) +
+             "  强度 " + FormatFloat(post.Bloom.Intensity) +
+             "  阈值 " + FormatFloat(post.Bloom.Threshold), textColor);
+    drawLine("半径 " + FormatFloat(post.Bloom.Radius) +
+             "  对比 " + FormatFloat(post.Contrast) +
+             "  饱和 " + FormatFloat(post.Saturation), textColor);
+    drawLine(std::string("线框:") + OnOff(state.WireframeEnabled) +
+             "  主光:" + FormatVec3(state.MainLightDirection), mutedColor);
+    drawLine("天空旋转 " + FormatFloat(state.SkyboxRotationDegrees), mutedColor);
 }
