@@ -12,7 +12,20 @@
 class Shader
 {
 public:
-    unsigned int ID;
+    unsigned int ID = 0;
+
+    Shader(const Shader&) = delete;
+    Shader& operator=(const Shader&) = delete;
+
+    ~Shader()
+    {
+        if (ID != 0)
+        {
+            glDeleteProgram(ID);
+            ID = 0;
+        }
+    }
+
     // constructor generates the shader on the fly
     // ------------------------------------------------------------------------
     Shader(const char* vertexPath, const char* fragmentPath)

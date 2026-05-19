@@ -4,6 +4,7 @@
 #include <glad/glad.h>
 
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
 #include <iostream>
@@ -62,7 +63,7 @@ private:
     unsigned int GetCubeVAO();
     void RenderCube();
 
-    std::map<std::string, Shader*> m_Shaders;
+    std::map<std::string, std::unique_ptr<Shader>> m_Shaders;
     std::map<std::string, unsigned int> m_Textures;
     std::map<std::string, unsigned int> m_Cubemaps;
     std::map<std::string, unsigned int> m_HDRTextures;

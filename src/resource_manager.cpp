@@ -4,6 +4,8 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <memory>
+
 ResourceManager& ResourceManager::GetInstance()
 {
     static ResourceManager instance;
@@ -12,14 +14,16 @@ ResourceManager& ResourceManager::GetInstance()
 
 Shader* ResourceManager::LoadShader(const std::string& name, const char* vertexPath, const char* fragmentPath)
 {
-    if (m_Shaders.find(name) != m_Shaders.end())
+    auto existing = m_Shaders.find(name);
+    if (existing != m_Shaders.end())
     {
-        return m_Shaders[name];
+        return existing->second.get();
     }
 
-    Shader* shader = new Shader(vertexPath, fragmentPath);
-    m_Shaders[name] = shader;
-    return shader;
+    auto shader = std::make_unique<Shader>(vertexPath, fragmentPath);
+    Shader* shaderPtr = shader.get();
+    m_Shaders[name] = std::move(shader);
+    return shaderPtr;
 }
 
 Shader* ResourceManager::GetShader(const std::string& name)
@@ -27,7 +31,7 @@ Shader* ResourceManager::GetShader(const std::string& name)
     auto it = m_Shaders.find(name);
     if (it != m_Shaders.end())
     {
-        return it->second;
+        return it->second.get();
     }
     std::cout << "Shader not found: " << name << std::endl;
     return nullptr;
@@ -774,11 +778,6 @@ unsigned int ResourceManager::GetBRDFLUT()
 
 void ResourceManager::Clear()
 {
-    for (auto& pair : m_Shaders)
-    {
-        glDeleteProgram(pair.second->ID);
-        delete pair.second;
-    }
     m_Shaders.clear();
 
     for (auto& pair : m_Textures)
