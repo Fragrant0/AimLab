@@ -18,7 +18,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp">
+    <ClCompile Include="src\main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\ecology_system.cpp">
@@ -110,12 +110,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="shaders\1.model_loading.fs">
-      <Filter>Resource Files</Filter>
-    </None>
-    <None Include="shaders\1.model_loading.vs">
-      <Filter>Resource Files</Filter>
-    </None>
     <None Include="shaders\plane.fs">
       <Filter>Resource Files</Filter>
     </None>

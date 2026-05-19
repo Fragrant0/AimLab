@@ -136,7 +136,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp" />
+    <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\ecology_system.cpp" />
     <ClCompile Include="src\game_manager.cpp" />
     <ClCompile Include="src\hud_renderer.cpp" />
@@ -168,8 +168,6 @@
     <ClCompile Include="src\stb_image.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="shaders\1.model_loading.fs" />
-    <None Include="shaders\1.model_loading.vs" />
     <None Include="shaders\plane.fs" />
     <None Include="shaders\plane.vs" />
     <None Include="shaders\skybox.fs" />

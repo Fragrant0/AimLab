@@ -301,41 +301,36 @@ void MapManager::LoadMapsFromJson(const std::string& path)
 
 void MapManager::SetupDefaultMaps()
 {
-    std::vector<std::string> skyboxFaces = {
-        "resources/textures/skybox/right.jpg",
-        "resources/textures/skybox/left.jpg",
-        "resources/textures/skybox/top.jpg",
-        "resources/textures/skybox/bottom.jpg",
-        "resources/textures/skybox/front.jpg",
-        "resources/textures/skybox/back.jpg"
-    };
-
     MapConfig spaceMap;
     spaceMap.Name = "Space";
-    spaceMap.Skybox.Type = SkyboxType::Cubemap;
-    spaceMap.Skybox.Faces = skyboxFaces;
-    spaceMap.FloorTexturePath = "resources/textures/Rugged Terrain with Rocky Peaks Diffuse PNG.png";
+    spaceMap.Skybox.Type = SkyboxType::HDR;
+    spaceMap.Skybox.HDRPath = "resources/textures/skybox_hdr/rogland_clear_night_1k.hdr";
+    spaceMap.FloorTexturePath = "resources/textures/ground/space_aerial_rocks_02_diff_1k.jpg";
     spaceMap.FloorTextureName = "floor_space";
     spaceMap.AmbientColor = glm::vec3(0.1f, 0.1f, 0.2f);
-    spaceMap.AmbientIntensity = 5.0f;
+    spaceMap.AmbientIntensity = 0.24f;
     SyncLegacyAmbient(spaceMap);
-    spaceMap.SpawnRadius = 10.0f;
-    spaceMap.Terrain = TerrainType::Flat;
-    spaceMap.PlayerStartPos = glm::vec3(0.0f, 1.0f, 3.0f);
+    spaceMap.SpawnRadius = 24.0f;
+    spaceMap.Terrain = TerrainType::Heightmap;
+    spaceMap.Heightmap.Path = "resources/textures/heightmaps/rocky_peaks_height.png";
+    spaceMap.Heightmap.HeightScale = 18.0f;
+    spaceMap.Heightmap.GridSize = 256;
+    spaceMap.Heightmap.Size = 70.0f;
+    spaceMap.PlayerStartPos = glm::vec3(0.0f, 3.0f, 8.0f);
     m_Maps.push_back(spaceMap);
 
     MapConfig natureMap;
     natureMap.Name = "Nature";
     natureMap.Skybox.Type = SkyboxType::HDR;
     natureMap.Skybox.HDRPath = "resources/textures/skybox_hdr/citrus_orchard_road_puresky_1k.hdr";
-    natureMap.FloorTexturePath = "resources/textures/Rugged Terrain with Rocky Peaks Diffuse PNG.png";
+    natureMap.FloorTexturePath = "resources/textures/terrain/nature_rocky_peaks_diffuse.png";
     natureMap.FloorTextureName = "floor_nature";
     natureMap.AmbientColor = glm::vec3(0.2f, 0.3f, 0.2f);
     natureMap.AmbientIntensity = 1.0f;
     SyncLegacyAmbient(natureMap);
     natureMap.SpawnRadius = 15.0f;
     natureMap.Terrain = TerrainType::Heightmap;
-    natureMap.Heightmap.Path = "resources/textures/heightmaps/Rugged Terrain with Rocky Peaks Height Map PNG.png";
+    natureMap.Heightmap.Path = "resources/textures/heightmaps/rocky_peaks_height.png";
     natureMap.Heightmap.HeightScale = 3.0f;
     natureMap.Heightmap.GridSize = 128;
     natureMap.Heightmap.Size = 30.0f;
@@ -345,14 +340,18 @@ void MapManager::SetupDefaultMaps()
     MapConfig cityMap;
     cityMap.Name = "City";
     cityMap.Skybox.Type = SkyboxType::HDR;
-    cityMap.Skybox.HDRPath = "resources/textures/skybox_hdr/citrus_orchard_road_puresky_1k.hdr";
-    cityMap.FloorTexturePath = "resources/textures/Rugged Terrain with Rocky Peaks Diffuse PNG.png";
+    cityMap.Skybox.HDRPath = "resources/textures/skybox_hdr/urban_street_04_1k.hdr";
+    cityMap.FloorTexturePath = "resources/textures/ground/city_asphalt_02_diff_1k.jpg";
     cityMap.FloorTextureName = "floor_city";
     cityMap.AmbientColor = glm::vec3(0.3f, 0.3f, 0.3f);
-    cityMap.AmbientIntensity = 1.0f;
+    cityMap.AmbientIntensity = 0.22f;
     SyncLegacyAmbient(cityMap);
-    cityMap.SpawnRadius = 10.0f;
-    cityMap.Terrain = TerrainType::Flat;
-    cityMap.PlayerStartPos = glm::vec3(0.0f, 1.0f, 3.0f);
+    cityMap.SpawnRadius = 18.0f;
+    cityMap.Terrain = TerrainType::Heightmap;
+    cityMap.Heightmap.Path = "resources/textures/heightmaps/rocky_peaks_height.png";
+    cityMap.Heightmap.HeightScale = 3.0f;
+    cityMap.Heightmap.GridSize = 256;
+    cityMap.Heightmap.Size = 48.0f;
+    cityMap.PlayerStartPos = glm::vec3(0.0f, 3.0f, 6.0f);
     m_Maps.push_back(cityMap);
 }

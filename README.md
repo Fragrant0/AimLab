@@ -19,11 +19,27 @@
 - nlohmann/json
 - Visual Studio 2022 / MSBuild / Debug x64
 
+## 项目结构
+
+```text
+include/                  C++ module headers
+src/                      C++ implementation files and entry point
+shaders/                  GLSL shaders grouped by render pass
+resources/maps_config.json Scene, terrain, lighting, post-process, and prop config
+resources/objects/        Runtime 3D assets
+resources/textures/ground Ground material textures
+resources/textures/terrain Terrain surface textures
+resources/textures/heightmaps Heightmap data
+resources/textures/skybox_hdr HDR environment maps for skybox and IBL
+scripts/                  Build and smoke-test helpers
+DLL/                      Runtime third-party DLLs
+```
+
 ## 主要模块
 
 | 模块 | 文件 | 展示价值 |
 | --- | --- | --- |
-| 游戏主循环 | `main.cpp`, `include/game_manager.h`, `src/game_manager.cpp` | 初始化、输入、更新、渲染和资源释放的完整客户端框架 |
+| 游戏主循环 | `src/main.cpp`, `include/game_manager.h`, `src/game_manager.cpp` | 初始化、输入、更新、渲染和资源释放的完整客户端框架 |
 | 资源管理 | `include/resource_manager.h`, `src/resource_manager.cpp` | Shader、Texture、Cubemap、HDR、IBL 资源加载、缓存与释放 |
 | 地图配置 | `include/map_manager.h`, `src/map_manager.cpp`, `resources/maps_config.json` | 用 JSON 驱动天空盒、地形、地表纹理、出生点、灯光和 PBR 展示物 |
 | 高度图地形 | `include/terrain.h`, `src/terrain.cpp` | 8/16-bit 高度图、法线重建、GPU 网格上传、运行时高度查询 |

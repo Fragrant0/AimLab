@@ -443,5 +443,9 @@ compile_commands.json
 # Editor config
 *.code-workspace
 
+# Runtime model assets may use the .obj extension; keep build artifacts ignored,
+# but allow source assets under resources/objects to be tracked.
+!resources/objects/**/*.obj
+
 # Trae AI IDE
 .trae/

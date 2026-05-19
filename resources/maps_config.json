@@ -56,7 +56,7 @@
       "terrain": "heightmap",
       "ecology_enabled": false,
       "heightmap": {
-        "path": "resources/textures/heightmaps/Rugged Terrain with Rocky Peaks Height Map PNG.png",
+        "path": "resources/textures/heightmaps/rocky_peaks_height.png",
         "height_scale": 18.0,
         "grid_size": 256,
         "size": 70.0
@@ -86,7 +86,7 @@
       "name": "Nature",
       "skybox_type": "hdr",
       "skybox_hdr": "resources/textures/skybox_hdr/citrus_orchard_road_puresky_1k.hdr",
-      "floor_texture": "resources/textures/Rugged Terrain with Rocky Peaks Diffuse PNG.png",
+      "floor_texture": "resources/textures/terrain/nature_rocky_peaks_diffuse.png",
       "floor_texture_name": "floor_nature",
       "ambient_color": [0.2, 0.3, 0.2],
       "ambient_intensity": 0.24,
@@ -132,7 +132,7 @@
       "terrain": "heightmap",
       "ecology_enabled": true,
       "heightmap": {
-        "path": "resources/textures/heightmaps/Rugged Terrain with Rocky Peaks Height Map PNG.png",
+        "path": "resources/textures/heightmaps/rocky_peaks_height.png",
         "height_scale": 60.0,
         "grid_size": 256,
         "size": 60.0
@@ -214,7 +214,7 @@
       "terrain": "heightmap",
       "ecology_enabled": false,
       "heightmap": {
-        "path": "resources/textures/heightmaps/Rugged Terrain with Rocky Peaks Height Map PNG.png",
+        "path": "resources/textures/heightmaps/rocky_peaks_height.png",
         "height_scale": 3.0,
         "grid_size": 256,
         "size": 48.0
