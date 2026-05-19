@@ -5,6 +5,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <memory>
 #include <string>
 
 #include "shader.h"
@@ -44,7 +45,7 @@ private:
     unsigned int m_LineVAO;
     unsigned int m_LineVBO;
 
-    Shader* m_UIShader;
+    std::unique_ptr<Shader> m_UIShader;
     bool m_Initialized;
     bool m_InRenderPass;
 };

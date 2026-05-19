@@ -4,6 +4,8 @@
 #include <glad/glad.h>
 #include <glm/glm.hpp>
 
+#include <memory>
+
 #include "camera.h"
 #include "shader.h"
 
@@ -19,7 +21,7 @@ public:
     void BeginDepthPass(const glm::vec3& lightDirection, const Camera& camera);
     void EndDepthPass();
 
-    Shader* GetDepthShader() const { return m_DepthShader; }
+    Shader* GetDepthShader() const { return m_DepthShader.get(); }
     unsigned int GetDepthMap() const { return m_DepthMap; }
     const glm::mat4& GetLightSpaceMatrix() const { return m_LightSpaceMatrix; }
 
@@ -27,7 +29,7 @@ private:
     unsigned int m_Size;
     unsigned int m_DepthFBO;
     unsigned int m_DepthMap;
-    Shader* m_DepthShader;
+    std::unique_ptr<Shader> m_DepthShader;
     glm::mat4 m_LightSpaceMatrix;
     GLint m_PreviousViewport[4];
     bool m_Initialized;

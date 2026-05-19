@@ -1,6 +1,7 @@
 #include "ui_renderer.h"
 
 #include <algorithm>
+#include <memory>
 
 UIRenderer::UIRenderer()
     : m_ScreenWidth(800),
@@ -10,7 +11,6 @@ UIRenderer::UIRenderer()
       m_RectVBO(0),
       m_LineVAO(0),
       m_LineVBO(0),
-      m_UIShader(nullptr),
       m_Initialized(false),
       m_InRenderPass(false)
 {
@@ -29,7 +29,7 @@ bool UIRenderer::Initialize(int screenWidth, int screenHeight)
     m_ScreenWidth = screenWidth;
     m_ScreenHeight = screenHeight;
 
-    m_UIShader = new Shader("shaders/ui.vs", "shaders/ui.fs");
+    m_UIShader = std::make_unique<Shader>("shaders/ui.vs", "shaders/ui.fs");
     if (!m_UIShader)
         return false;
 
@@ -50,8 +50,7 @@ void UIRenderer::Cleanup()
     if (m_LineVAO) { glDeleteVertexArrays(1, &m_LineVAO); m_LineVAO = 0; }
     if (m_LineVBO) { glDeleteBuffers(1, &m_LineVBO); m_LineVBO = 0; }
 
-    delete m_UIShader;
-    m_UIShader = nullptr;
+    m_UIShader.reset();
 
     m_Initialized = false;
     m_InRenderPass = false;

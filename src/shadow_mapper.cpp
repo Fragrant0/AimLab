@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <iostream>
+#include <memory>
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -9,7 +10,6 @@ ShadowMapper::ShadowMapper()
     : m_Size(2048),
       m_DepthFBO(0),
       m_DepthMap(0),
-      m_DepthShader(nullptr),
       m_LightSpaceMatrix(1.0f),
       m_PreviousViewport{0, 0, 0, 0},
       m_Initialized(false)
@@ -27,7 +27,7 @@ bool ShadowMapper::Initialize(unsigned int size)
         return true;
 
     m_Size = size;
-    m_DepthShader = new Shader("shaders/shadow_depth.vs", "shaders/shadow_depth.fs");
+    m_DepthShader = std::make_unique<Shader>("shaders/shadow_depth.vs", "shaders/shadow_depth.fs");
 
     glGenFramebuffers(1, &m_DepthFBO);
     glGenTextures(1, &m_DepthMap);
@@ -57,8 +57,7 @@ void ShadowMapper::Cleanup()
 {
     if (m_DepthMap) { glDeleteTextures(1, &m_DepthMap); m_DepthMap = 0; }
     if (m_DepthFBO) { glDeleteFramebuffers(1, &m_DepthFBO); m_DepthFBO = 0; }
-    delete m_DepthShader;
-    m_DepthShader = nullptr;
+    m_DepthShader.reset();
     m_Initialized = false;
 }
 

@@ -7,12 +7,12 @@
 #include <algorithm>
 #include <iostream>
 #include <fstream>
+#include <memory>
 
 FontRenderer::FontRenderer()
     : m_AtlasTexture(0),
       m_VAO(0),
       m_VBO(0),
-      m_Shader(nullptr),
       m_ScreenWidth(800),
       m_ScreenHeight(600),
       m_Projection(1.0f),
@@ -81,7 +81,7 @@ bool FontRenderer::Initialize(int screenWidth, int screenHeight, const std::stri
                           (void*)offsetof(TextVertex, r));
     glBindVertexArray(0);
 
-    m_Shader = new Shader("shaders/font.vs", "shaders/font.fs");
+    m_Shader = std::make_unique<Shader>("shaders/font.vs", "shaders/font.fs");
     m_Projection = glm::ortho(0.0f, static_cast<float>(m_ScreenWidth),
                                0.0f, static_cast<float>(m_ScreenHeight),
                                -1.0f, 1.0f);
@@ -99,7 +99,7 @@ void FontRenderer::Cleanup()
     if (m_AtlasTexture) { glDeleteTextures(1, &m_AtlasTexture); m_AtlasTexture = 0; }
     if (m_VAO) { glDeleteVertexArrays(1, &m_VAO); m_VAO = 0; }
     if (m_VBO) { glDeleteBuffers(1, &m_VBO); m_VBO = 0; }
-    if (m_Shader) { delete m_Shader; m_Shader = nullptr; }
+    m_Shader.reset();
 
     m_Initialized = false;
 }

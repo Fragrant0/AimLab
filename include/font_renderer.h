@@ -7,6 +7,7 @@
 
 #include <string>
 #include <vector>
+#include <memory>
 
 #include "shader.h"
 #include <stb_truetype.h>
@@ -42,7 +43,7 @@ private:
     unsigned int m_AtlasTexture;
     unsigned int m_VAO;
     unsigned int m_VBO;
-    Shader* m_Shader;
+    std::unique_ptr<Shader> m_Shader;
 
     int m_ScreenWidth;
     int m_ScreenHeight;
