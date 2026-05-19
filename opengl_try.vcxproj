@@ -192,6 +192,8 @@
     <None Include="shaders\brdf.fs" />
     <None Include="shaders\pbr_model.vs" />
     <None Include="shaders\pbr_model.fs" />
+    <None Include="shaders\bloom_extract.fs" />
+    <None Include="shaders\bloom_blur.fs" />
     <None Include="shaders\post_process.vs" />
     <None Include="shaders\post_process.fs" />
     <None Include="shaders\shadow_depth.vs" />

@@ -4,6 +4,7 @@ out vec4 FragColor;
 in vec2 TexCoords;
 
 uniform sampler2D sceneTexture;
+uniform sampler2D bloomTexture;
 uniform float exposure;
 uniform float gammaValue;
 uniform float contrast;
@@ -12,7 +13,6 @@ uniform float vignette;
 uniform float chromaticAberration;
 uniform float filmGrain;
 uniform float bloomIntensity;
-uniform float bloomThreshold;
 uniform float timeSeconds;
 
 float Hash(vec2 p)
@@ -48,8 +48,7 @@ void main()
         color = texture(sceneTexture, uv).rgb;
     }
 
-    vec3 bloomApprox = max(color - vec3(max(bloomThreshold, 0.01)), vec3(0.0));
-    color += bloomApprox * bloomIntensity;
+    color += texture(bloomTexture, uv).rgb * bloomIntensity;
 
     color *= exposure;
     color = ACESFilm(color);

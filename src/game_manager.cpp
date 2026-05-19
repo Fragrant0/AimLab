@@ -17,6 +17,25 @@ GameManager::GameManager()
       m_SkyboxRotation(0.0f),
       m_Initialized(false),
       m_WireframePressed(false),
+      m_DebugOverlayVisible(false),
+      m_PostEffectsEnabled(true),
+      m_BloomEnabled(true),
+      m_ShadowsEnabled(true),
+      m_DebugF1Pressed(false),
+      m_DebugF2Pressed(false),
+      m_DebugF3Pressed(false),
+      m_DebugF4Pressed(false),
+      m_DebugTabPressed(false),
+      m_DebugDecreasePressed(false),
+      m_DebugIncreasePressed(false),
+      m_DebugResetPressed(false),
+      m_DebugSelectedParameter(DebugParameter::Exposure),
+      m_DebugExposureOffset(0.0f),
+      m_DebugBloomIntensityOffset(0.0f),
+      m_DebugBloomThresholdOffset(0.0f),
+      m_DebugBloomRadiusOffset(0.0f),
+      m_DebugContrastOffset(0.0f),
+      m_DebugSaturationOffset(0.0f),
       m_HitMarkerTimer(0.0f),
       m_HitMarkerActive(false),
       m_ScreenWidth(SCR_WIDTH),
@@ -265,12 +284,159 @@ void GameManager::ProcessInput(GLFWwindow* window)
         if (!s_Key3Pressed) { SwitchMap(2); s_Key3Pressed = true; }
     }
     else s_Key3Pressed = false;
+
+    HandleDebugInput(window);
 }
 
 void GameManager::ToggleWireframe()
 {
     m_WireframeMode = !m_WireframeMode;
     std::cout << "[RENDER] Wireframe mode: " << (m_WireframeMode ? "ON" : "OFF") << std::endl;
+}
+
+void GameManager::HandleDebugInput(GLFWwindow* window)
+{
+    auto consumePress = [](bool pressed, bool& latch) {
+        if (pressed)
+        {
+            if (!latch)
+            {
+                latch = true;
+                return true;
+            }
+            return false;
+        }
+        latch = false;
+        return false;
+    };
+
+    if (consumePress(glfwGetKey(window, GLFW_KEY_F1) == GLFW_PRESS, m_DebugF1Pressed))
+        m_DebugOverlayVisible = !m_DebugOverlayVisible;
+
+    if (consumePress(glfwGetKey(window, GLFW_KEY_F2) == GLFW_PRESS, m_DebugF2Pressed))
+        m_PostEffectsEnabled = !m_PostEffectsEnabled;
+
+    if (consumePress(glfwGetKey(window, GLFW_KEY_F3) == GLFW_PRESS, m_DebugF3Pressed))
+        m_BloomEnabled = !m_BloomEnabled;
+
+    if (consumePress(glfwGetKey(window, GLFW_KEY_F4) == GLFW_PRESS, m_DebugF4Pressed))
+        m_ShadowsEnabled = !m_ShadowsEnabled;
+
+    if (consumePress(glfwGetKey(window, GLFW_KEY_TAB) == GLFW_PRESS, m_DebugTabPressed))
+    {
+        int next = static_cast<int>(m_DebugSelectedParameter) + 1;
+        if (next >= static_cast<int>(DebugParameter::Count))
+            next = 0;
+        m_DebugSelectedParameter = static_cast<DebugParameter>(next);
+    }
+
+    const bool decreasePressed = glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS ||
+                                 glfwGetKey(window, GLFW_KEY_MINUS) == GLFW_PRESS ||
+                                 glfwGetKey(window, GLFW_KEY_KP_SUBTRACT) == GLFW_PRESS;
+    const bool increasePressed = glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS ||
+                                 glfwGetKey(window, GLFW_KEY_EQUAL) == GLFW_PRESS ||
+                                 glfwGetKey(window, GLFW_KEY_KP_ADD) == GLFW_PRESS;
+    const bool fastStep = glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS ||
+                          glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS;
+    const float stepScale = fastStep ? 5.0f : 1.0f;
+
+    if (consumePress(decreasePressed, m_DebugDecreasePressed))
+        AdjustDebugParameter(-stepScale);
+
+    if (consumePress(increasePressed, m_DebugIncreasePressed))
+        AdjustDebugParameter(stepScale);
+
+    if (consumePress(glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS, m_DebugResetPressed))
+        ResetDebugAdjustments();
+}
+
+void GameManager::AdjustDebugParameter(float direction)
+{
+    const PostProcessConfig base = m_MapManager ? m_MapManager->GetCurrentPostProcess() : PostProcessConfig();
+    auto adjustOffset = [direction](float baseValue, float& offset, float step, float minValue, float maxValue) {
+        const float value = std::clamp(baseValue + offset + direction * step, minValue, maxValue);
+        offset = value - baseValue;
+    };
+
+    switch (m_DebugSelectedParameter)
+    {
+    case DebugParameter::Exposure:
+        adjustOffset(base.Exposure, m_DebugExposureOffset, 0.05f, 0.05f, 4.0f);
+        break;
+    case DebugParameter::BloomIntensity:
+        adjustOffset(base.Bloom.Intensity, m_DebugBloomIntensityOffset, 0.05f, 0.0f, 2.0f);
+        break;
+    case DebugParameter::BloomThreshold:
+        adjustOffset(base.Bloom.Threshold, m_DebugBloomThresholdOffset, 0.05f, 0.0f, 5.0f);
+        break;
+    case DebugParameter::BloomRadius:
+        adjustOffset(base.Bloom.Radius, m_DebugBloomRadiusOffset, 0.05f, 0.0f, 1.0f);
+        break;
+    case DebugParameter::Contrast:
+        adjustOffset(base.Contrast, m_DebugContrastOffset, 0.05f, 0.5f, 2.0f);
+        break;
+    case DebugParameter::Saturation:
+        adjustOffset(base.Saturation, m_DebugSaturationOffset, 0.05f, 0.0f, 2.0f);
+        break;
+    case DebugParameter::Count:
+        break;
+    }
+}
+
+void GameManager::ResetDebugAdjustments()
+{
+    m_PostEffectsEnabled = true;
+    m_BloomEnabled = true;
+    m_ShadowsEnabled = true;
+    m_DebugExposureOffset = 0.0f;
+    m_DebugBloomIntensityOffset = 0.0f;
+    m_DebugBloomThresholdOffset = 0.0f;
+    m_DebugBloomRadiusOffset = 0.0f;
+    m_DebugContrastOffset = 0.0f;
+    m_DebugSaturationOffset = 0.0f;
+}
+
+PostProcessConfig GameManager::GetEffectivePostProcessConfig() const
+{
+    PostProcessConfig config = m_MapManager ? m_MapManager->GetCurrentPostProcess() : PostProcessConfig();
+
+    config.Exposure = std::clamp(config.Exposure + m_DebugExposureOffset, 0.05f, 4.0f);
+    config.Bloom.Intensity = std::clamp(config.Bloom.Intensity + m_DebugBloomIntensityOffset, 0.0f, 2.0f);
+    config.Bloom.Threshold = std::clamp(config.Bloom.Threshold + m_DebugBloomThresholdOffset, 0.0f, 5.0f);
+    config.Bloom.Radius = std::clamp(config.Bloom.Radius + m_DebugBloomRadiusOffset, 0.0f, 1.0f);
+    config.Contrast = std::clamp(config.Contrast + m_DebugContrastOffset, 0.5f, 2.0f);
+    config.Saturation = std::clamp(config.Saturation + m_DebugSaturationOffset, 0.0f, 2.0f);
+
+    if (!m_PostEffectsEnabled)
+    {
+        config.Contrast = 1.0f;
+        config.Saturation = 1.0f;
+        config.Vignette = 0.0f;
+        config.ChromaticAberration = 0.0f;
+        config.FilmGrain = 0.0f;
+        config.Bloom.Enabled = false;
+    }
+    else
+    {
+        config.Bloom.Enabled = config.Bloom.Enabled && m_BloomEnabled;
+    }
+
+    return config;
+}
+
+DebugOverlayState GameManager::BuildDebugOverlayState(const glm::vec3& mainLightDirection) const
+{
+    DebugOverlayState state;
+    state.Visible = m_DebugOverlayVisible;
+    state.PostEffectsEnabled = m_PostEffectsEnabled;
+    state.PostProcess = GetEffectivePostProcessConfig();
+    state.BloomEnabled = m_PostEffectsEnabled && m_BloomEnabled && state.PostProcess.Bloom.Enabled;
+    state.ShadowsEnabled = m_ShadowsEnabled;
+    state.WireframeEnabled = m_WireframeMode;
+    state.SelectedParameter = static_cast<int>(m_DebugSelectedParameter);
+    state.MainLightDirection = mainLightDirection;
+    state.SkyboxRotationDegrees = glm::degrees(m_SkyboxRotation);
+    return state;
 }
 
 void GameManager::Update(float deltaTime)
@@ -316,7 +482,11 @@ void GameManager::Update(float deltaTime)
 void GameManager::Render()
 {
     glm::vec3 mainLightDirection = GetRotatedMainLightDirection();
-    RenderShadowMap(mainLightDirection);
+    if (m_ShadowsEnabled)
+        RenderShadowMap(mainLightDirection);
+
+    ShadowMapper* activeShadowMapper = m_ShadowsEnabled ? m_ShadowMapper.get() : nullptr;
+    PostProcessConfig postProcessConfig = GetEffectivePostProcessConfig();
 
     if (m_PostProcessRenderer)
         m_PostProcessRenderer->BeginScene();
@@ -327,16 +497,17 @@ void GameManager::Render()
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
 
-    RenderScene(mainLightDirection);
+    RenderScene(mainLightDirection, activeShadowMapper);
 
     if (m_PostProcessRenderer)
     {
         m_PostProcessRenderer->EndScene();
-        m_PostProcessRenderer->RenderToScreen(static_cast<float>(glfwGetTime()), m_MapManager->GetCurrentPostProcess());
+        m_PostProcessRenderer->RenderToScreen(static_cast<float>(glfwGetTime()), postProcessConfig);
     }
 
     if (m_UIRenderer && m_ScoreSystem && m_MapManager && m_FontRenderer)
     {
+        DebugOverlayState debugOverlay = BuildDebugOverlayState(mainLightDirection);
         m_HudRenderer.Render(*m_UIRenderer,
                              *m_FontRenderer,
                              *m_ScoreSystem,
@@ -345,7 +516,8 @@ void GameManager::Render()
                              m_ScreenWidth,
                              m_ScreenHeight,
                              m_HitMarkerActive,
-                             m_HitMarkerTimer);
+                             m_HitMarkerTimer,
+                             &debugOverlay);
     }
 }
 
@@ -382,7 +554,7 @@ void GameManager::RenderShadowMap(const glm::vec3& mainLightDirection)
                                 mainLightDirection);
 }
 
-void GameManager::RenderScene(const glm::vec3& mainLightDirection)
+void GameManager::RenderScene(const glm::vec3& mainLightDirection, ShadowMapper* activeShadowMapper)
 {
     glm::mat4 projection = glm::perspective(glm::radians(m_Camera.Zoom), (float)m_ScreenWidth / (float)m_ScreenHeight, 0.1f, 100.0f);
     glm::mat4 view = m_Camera.GetViewMatrix();
@@ -404,7 +576,7 @@ void GameManager::RenderScene(const glm::vec3& mainLightDirection)
                                               view,
                                               m_MapManager->GetCurrentLighting(),
                                               mainLightDirection,
-                                              m_ShadowMapper.get());
+                                              activeShadowMapper);
         }
         else
         {
@@ -415,7 +587,7 @@ void GameManager::RenderScene(const glm::vec3& mainLightDirection)
                                           view,
                                           m_MapManager->GetCurrentLighting(),
                                           mainLightDirection,
-                                          m_ShadowMapper.get());
+                                          activeShadowMapper);
         }
 
         if (m_EcologySystem && m_EcologySystem->IsReady())
@@ -435,7 +607,7 @@ void GameManager::RenderScene(const glm::vec3& mainLightDirection)
                                  projection,
                                  view,
                                  mainLightDirection,
-                                 m_ShadowMapper.get());
+                                 activeShadowMapper);
 
         m_TargetRenderer.Render(m_TargetManager.get(),
                                 m_Camera,

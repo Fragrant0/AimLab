@@ -182,6 +182,12 @@
     <None Include="shaders\pbr_model.fs">
       <Filter>Resource Files</Filter>
     </None>
+    <None Include="shaders\bloom_extract.fs">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="shaders\bloom_blur.fs">
+      <Filter>Resource Files</Filter>
+    </None>
     <None Include="shaders\post_process.vs">
       <Filter>Resource Files</Filter>
     </None>

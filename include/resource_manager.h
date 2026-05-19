@@ -27,17 +27,16 @@ public:
     unsigned int GetCubemap(const std::string& name);
     void UnloadCubemap(const std::string& name);
 
-    // HDR???
     unsigned int LoadHDRTexture(const std::string& name, const char* path);
     unsigned int GetHDRTexture(const std::string& name);
     void UnloadHDRTexture(const std::string& name);
 
-    // HDR????????HDR????????????????????
+    // Converts an equirectangular HDR image into a cubemap skybox.
     unsigned int LoadHDRSkybox(const std::string& name, const char* hdrPath);
     unsigned int GetHDRSkybox(const std::string& name);
     void UnloadHDRSkybox(const std::string& name);
 
-    // IBL ????????
+    // Precomputed image-based lighting resources for an HDR skybox.
     unsigned int GetIrradianceMap(const std::string& skyboxName);
     unsigned int GetPrefilterMap(const std::string& skyboxName);
     unsigned int GetBRDFLUT();
@@ -50,16 +49,16 @@ private:
     ResourceManager(const ResourceManager&) = delete;
     ResourceManager& operator=(const ResourceManager&) = delete;
 
-    // ??HDR??????????????????????FBO?????????
+    // Creates the runtime skybox cubemap used by IBL preprocessing.
     unsigned int CreateCubemapFromHDR(unsigned int hdrTexture, int cubemapSize = 512);
 
-    // IBL ?????
+    // Generates irradiance, prefilter, and BRDF lookup textures.
     void PrecomputeIBL(const std::string& skyboxName, unsigned int envCubemap);
     unsigned int CreateIrradianceMap(unsigned int envCubemap);
     unsigned int CreatePrefilterMap(unsigned int envCubemap);
     unsigned int CreateBRDFLUT();
 
-    // ???????????????VAO???????????????
+    // Shared cube geometry for cubemap capture passes.
     unsigned int GetCubeVAO();
     void RenderCube();
 

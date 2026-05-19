@@ -7,6 +7,8 @@
 #include "ui_utils.h"
 
 #include <algorithm>
+#include <iomanip>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -37,6 +39,13 @@ namespace UILayout
     constexpr float CROSSHAIR_SIZE = 12.0f;
     constexpr float CROSSHAIR_GAP = 4.0f;
     constexpr float CROSSHAIR_THICKNESS = 2.0f;
+
+    constexpr float DEBUG_PANEL_WIDTH = 520.0f;
+    constexpr float DEBUG_PANEL_HEIGHT = 360.0f;
+    constexpr float DEBUG_PANEL_OFFSET_Y = 282.0f;
+    constexpr float DEBUG_PANEL_PADDING = 14.0f;
+    constexpr float DEBUG_FONT_SCALE = 0.42f;
+    constexpr float DEBUG_ROW_GAP = 4.0f;
 }
 
 namespace
@@ -65,6 +74,40 @@ namespace
         glm::vec3 keyColor;
         glm::vec3 actionColor;
     };
+
+    const char* DebugParamName(int index)
+    {
+        switch (index)
+        {
+        case 0: return "Exposure";
+        case 1: return "Bloom Intensity";
+        case 2: return "Bloom Threshold";
+        case 3: return "Bloom Radius";
+        case 4: return "Contrast";
+        case 5: return "Saturation";
+        default: return "Unknown";
+        }
+    }
+
+    std::string FormatFloat(float value)
+    {
+        std::ostringstream stream;
+        stream << std::fixed << std::setprecision(2) << value;
+        return stream.str();
+    }
+
+    std::string FormatVec3(const glm::vec3& value)
+    {
+        std::ostringstream stream;
+        stream << std::fixed << std::setprecision(2)
+               << value.x << ", " << value.y << ", " << value.z;
+        return stream.str();
+    }
+
+    const char* OnOff(bool enabled)
+    {
+        return enabled ? "ON" : "OFF";
+    }
 }
 
 void HudRenderer::Render(UIRenderer& uiRenderer,
@@ -75,7 +118,8 @@ void HudRenderer::Render(UIRenderer& uiRenderer,
                          int screenWidth,
                          int screenHeight,
                          bool hitMarkerActive,
-                         float hitMarkerTimer)
+                         float hitMarkerTimer,
+                         const DebugOverlayState* debugOverlay)
 {
     const float uiScale = UIUtils::GetUIScale(screenWidth, screenHeight);
 
@@ -85,6 +129,9 @@ void HudRenderer::Render(UIRenderer& uiRenderer,
 
     if (hitFeedback)
         hitFeedback->Render(fontRenderer);
+
+    if (debugOverlay && debugOverlay->Visible)
+        RenderDebugOverlay(uiRenderer, fontRenderer, *debugOverlay, screenWidth, screenHeight, uiScale);
 
     fontRenderer.Flush();
 }
@@ -247,7 +294,8 @@ void HudRenderer::RenderHintPanel(FontRenderer& fontRenderer,
     const HintRow kHintRows[] = {
         {"MAP", mapName.c_str(), glm::vec3(0.96f, 0.97f, 0.99f), glm::vec3(1.0f, 0.82f, 0.24f)},
         {"WASD", "MOVE", glm::vec3(0.96f, 0.97f, 0.99f), glm::vec3(1.0f, 0.82f, 0.24f)},
-        {"Space", "WIREFRAME", glm::vec3(0.96f, 0.97f, 0.99f), glm::vec3(0.72f, 0.84f, 1.0f)}
+        {"Space", "WIREFRAME", glm::vec3(0.96f, 0.97f, 0.99f), glm::vec3(0.72f, 0.84f, 1.0f)},
+        {"F1", "DEBUG", glm::vec3(0.96f, 0.97f, 0.99f), glm::vec3(0.72f, 0.84f, 1.0f)}
     };
 
     const float h = static_cast<float>(screenHeight);
@@ -275,4 +323,73 @@ void HudRenderer::RenderHintPanel(FontRenderer& fontRenderer,
 
         currentTop = UIUtils::SnapToPixel(textY - rowGap);
     }
+}
+
+void HudRenderer::RenderDebugOverlay(UIRenderer& uiRenderer,
+                                     FontRenderer& fontRenderer,
+                                     const DebugOverlayState& state,
+                                     int screenWidth,
+                                     int screenHeight,
+                                     float uiScale)
+{
+    const float w = static_cast<float>(screenWidth);
+    const float h = static_cast<float>(screenHeight);
+    const float margin = UIUtils::ScaleToScreen(UILayout::HINT_MARGIN, uiScale);
+    const float panelWidth = std::min(UIUtils::ScaleToScreen(UILayout::DEBUG_PANEL_WIDTH, uiScale),
+                                      std::max(1.0f, w - margin * 2.0f));
+    const float panelHeight = UIUtils::ScaleToScreen(UILayout::DEBUG_PANEL_HEIGHT, uiScale);
+    const float panelX = margin;
+    const float panelTop = h - margin - UIUtils::ScaleToScreen(UILayout::DEBUG_PANEL_OFFSET_Y, uiScale);
+    const float panelY = std::max(margin, panelTop - panelHeight);
+    const float padding = UIUtils::ScaleToScreen(UILayout::DEBUG_PANEL_PADDING, uiScale);
+
+    uiRenderer.Begin();
+    uiRenderer.DrawRect(panelX, panelY, panelWidth, panelHeight, glm::vec3(0.02f, 0.025f, 0.03f), 0.76f);
+    uiRenderer.DrawRectOutline(panelX, panelY, panelWidth, panelHeight, glm::vec3(0.14f, 0.95f, 0.74f), 1.0f);
+    uiRenderer.End();
+
+    const float textScale = UILayout::DEBUG_FONT_SCALE * uiScale;
+    const float lineHeight = UIUtils::SnapToPixel(fontRenderer.GetLineHeight(textScale));
+    const float rowGap = UIUtils::ScaleToScreen(UILayout::DEBUG_ROW_GAP, uiScale);
+    const float textX = panelX + padding;
+    float currentTop = UIUtils::SnapToPixel(panelY + panelHeight - padding);
+
+    auto drawLine = [&](const std::string& text, const glm::vec3& color) {
+        const float textY = UIUtils::SnapToPixel(currentTop - lineHeight);
+        fontRenderer.DrawText(textX, textY, textScale, text, color);
+        currentTop = UIUtils::SnapToPixel(textY - rowGap);
+    };
+
+    const glm::vec3 titleColor(0.18f, 0.96f, 0.78f);
+    const glm::vec3 textColor(0.88f, 0.94f, 0.98f);
+    const glm::vec3 mutedColor(0.56f, 0.66f, 0.74f);
+    const glm::vec3 selectedColor(1.0f, 0.80f, 0.30f);
+
+    drawLine("DEBUG RENDER", titleColor);
+    drawLine(std::string("F2 PostFX ") + OnOff(state.PostEffectsEnabled) +
+             "   F3 Bloom " + OnOff(state.BloomEnabled) +
+             "   F4 Shadows " + OnOff(state.ShadowsEnabled), textColor);
+    drawLine("TAB Select   Left/Right Adjust   R Reset", mutedColor);
+    drawLine(std::string("Wireframe ") + OnOff(state.WireframeEnabled) +
+             "   Selected: " + DebugParamName(state.SelectedParameter), mutedColor);
+
+    const PostProcessConfig& post = state.PostProcess;
+    const std::string values[] = {
+        std::string("Exposure         ") + FormatFloat(post.Exposure),
+        std::string("Bloom Intensity  ") + FormatFloat(post.Bloom.Intensity),
+        std::string("Bloom Threshold  ") + FormatFloat(post.Bloom.Threshold),
+        std::string("Bloom Radius     ") + FormatFloat(post.Bloom.Radius),
+        std::string("Contrast         ") + FormatFloat(post.Contrast),
+        std::string("Saturation       ") + FormatFloat(post.Saturation)
+    };
+
+    for (int i = 0; i < 6; ++i)
+    {
+        const bool selected = i == state.SelectedParameter;
+        drawLine(std::string(selected ? "> " : "  ") + values[i],
+                 selected ? selectedColor : textColor);
+    }
+
+    drawLine(std::string("Light Dir        ") + FormatVec3(state.MainLightDirection), mutedColor);
+    drawLine(std::string("Skybox Rotation  ") + FormatFloat(state.SkyboxRotationDegrees) + " deg", mutedColor);
 }

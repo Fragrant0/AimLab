@@ -86,12 +86,9 @@ bool Terrain::GenerateFromHeightmap(const std::string& heightmapPath, float heig
         for (int x = 0; x <= gridSize; ++x)
         {
             TerrainVertex vertex;
-
-           
             float worldX = -halfSize + x * stepX;
             float worldZ = -halfSize + z * stepZ;
 
-            
             float u = static_cast<float>(x) / static_cast<float>(gridSize);
             float v = static_cast<float>(z) / static_cast<float>(gridSize);
             float heightValue = SampleHeightmap(u, v);
@@ -102,7 +99,7 @@ bool Terrain::GenerateFromHeightmap(const std::string& heightmapPath, float heig
                 static_cast<float>(x) / gridSize,
                 static_cast<float>(z) / gridSize
             );
-            vertex.Normal = glm::vec3(0.0f, 1.0f, 0.0f); // ??????????????
+            vertex.Normal = glm::vec3(0.0f, 1.0f, 0.0f);
 
             m_Vertices.push_back(vertex);
 

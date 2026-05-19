@@ -73,16 +73,32 @@ private:
     void SetupEcology();
     void LoadMapResources();
     void UnloadMapResources(int mapIndex);
-    void RenderScene(const glm::vec3& mainLightDirection);
+    void RenderScene(const glm::vec3& mainLightDirection, ShadowMapper* activeShadowMapper);
     void RenderShadowMap(const glm::vec3& mainLightDirection);
     void Shoot();
     void SwitchMap(int mapIndex);
     void ResetGameState();
     void ClampPlayerToTerrain();
     void ToggleWireframe();
+    void HandleDebugInput(GLFWwindow* window);
+    void AdjustDebugParameter(float direction);
+    void ResetDebugAdjustments();
+    PostProcessConfig GetEffectivePostProcessConfig() const;
+    DebugOverlayState BuildDebugOverlayState(const glm::vec3& mainLightDirection) const;
 
     glm::vec2 WorldToScreen(const glm::vec3& worldPos, const glm::mat4& projection, const glm::mat4& view);
     glm::vec3 GetRotatedMainLightDirection() const;
+
+    enum class DebugParameter
+    {
+        Exposure = 0,
+        BloomIntensity,
+        BloomThreshold,
+        BloomRadius,
+        Contrast,
+        Saturation,
+        Count
+    };
 
     GLFWwindow* m_Window;
     Camera m_Camera;
@@ -122,6 +138,25 @@ private:
     float m_SkyboxRotation;
     bool m_Initialized;
     bool m_WireframePressed;
+    bool m_DebugOverlayVisible;
+    bool m_PostEffectsEnabled;
+    bool m_BloomEnabled;
+    bool m_ShadowsEnabled;
+    bool m_DebugF1Pressed;
+    bool m_DebugF2Pressed;
+    bool m_DebugF3Pressed;
+    bool m_DebugF4Pressed;
+    bool m_DebugTabPressed;
+    bool m_DebugDecreasePressed;
+    bool m_DebugIncreasePressed;
+    bool m_DebugResetPressed;
+    DebugParameter m_DebugSelectedParameter;
+    float m_DebugExposureOffset;
+    float m_DebugBloomIntensityOffset;
+    float m_DebugBloomThresholdOffset;
+    float m_DebugBloomRadiusOffset;
+    float m_DebugContrastOffset;
+    float m_DebugSaturationOffset;
 
     float m_HitMarkerTimer;
     bool m_HitMarkerActive;

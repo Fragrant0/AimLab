@@ -309,7 +309,6 @@ unsigned int ResourceManager::LoadHDRSkybox(const std::string& name, const char*
     unsigned int cubemapID = CreateCubemapFromHDR(hdrTexture, 512);
     m_HDRSkyboxes[name] = cubemapID;
 
-    // ????? IBL
     PrecomputeIBL(name, cubemapID);
 
     return cubemapID;
@@ -364,7 +363,7 @@ unsigned int ResourceManager::CreateCubemapFromHDR(unsigned int hdrTexture, int 
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, cubemapSize, cubemapSize);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, captureRBO);
 
-    // ?????????????????
+    // Allocate the target cubemap faces before the capture pass.
     unsigned int envCubemap;
     glGenTextures(1, &envCubemap);
     glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
@@ -378,7 +377,7 @@ unsigned int ResourceManager::CreateCubemapFromHDR(unsigned int hdrTexture, int 
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-    // ????HDR??????????????????
+    // Render the equirectangular HDR texture into the cubemap.
     Shader* hdrToCubemapShader = LoadShader("hdr_to_cubemap", "shaders/hdr_to_cubemap.vs", "shaders/hdr_to_cubemap.fs");
     if (!hdrToCubemapShader)
     {
@@ -388,7 +387,6 @@ unsigned int ResourceManager::CreateCubemapFromHDR(unsigned int hdrTexture, int 
         return 0;
     }
 
-    // ????????????
     glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
     glm::mat4 captureViews[] =
     {
@@ -400,14 +398,12 @@ unsigned int ResourceManager::CreateCubemapFromHDR(unsigned int hdrTexture, int 
         glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f,  0.0f, -1.0f), glm::vec3(0.0f, -1.0f,  0.0f))
     };
 
-    // ????????????????6????
     hdrToCubemapShader->use();
     hdrToCubemapShader->setInt("equirectangularMap", 0);
     hdrToCubemapShader->setMat4("projection", captureProjection);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, hdrTexture);
 
-    // ???????????????VAO?????
     float skyboxVertices[] = {
         -1.0f,  1.0f, -1.0f,
         -1.0f, -1.0f, -1.0f,
@@ -473,13 +469,11 @@ unsigned int ResourceManager::CreateCubemapFromHDR(unsigned int hdrTexture, int 
     }
     glBindVertexArray(0);
 
-    // ??????????
     glDeleteVertexArrays(1, &skyboxVAO);
     glDeleteBuffers(1, &skyboxVBO);
     glDeleteFramebuffers(1, &captureFBO);
     glDeleteRenderbuffers(1, &captureRBO);
 
-    // ????????
     glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
 
     return envCubemap;
@@ -726,7 +720,7 @@ unsigned int ResourceManager::CreateBRDFLUT()
     brdfShader->use();
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    // ??? quad
+    // Full-screen quad for the BRDF integration pass.
     float quadVertices[] = {
         -1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
         -1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
