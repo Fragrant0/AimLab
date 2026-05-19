@@ -140,6 +140,7 @@
     <ClCompile Include="src\resource_manager.cpp" />
     <ClCompile Include="src\sphere_mesh.cpp" />
     <ClCompile Include="src\target_manager.cpp" />
+    <ClCompile Include="src\target_renderer.cpp" />
     <ClCompile Include="src\target_sphere.cpp" />
     <ClCompile Include="src\raycast.cpp" />
     <ClCompile Include="src\score_system.cpp" />
@@ -208,6 +209,7 @@
     <ClInclude Include="include\stb_image.h" />
     <ClInclude Include="include\stb_truetype.h" />
     <ClInclude Include="include\target_manager.h" />
+    <ClInclude Include="include\target_renderer.h" />
     <ClInclude Include="include\target_sphere.h" />
     <ClInclude Include="include\raycast.h" />
     <ClInclude Include="include\score_system.h" />

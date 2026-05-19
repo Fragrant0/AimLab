@@ -16,6 +16,7 @@
 #include "shader.h"
 #include "model.h"
 #include "resource_manager.h"
+#include "target_renderer.h"
 #include "target_manager.h"
 #include "raycast.h"
 #include "score_system.h"
@@ -72,7 +73,6 @@ private:
     void LoadMapResources();
     void UnloadMapResources(int mapIndex);
     void RenderScene(const glm::vec3& mainLightDirection);
-    void RenderTargets(glm::mat4 projection, glm::mat4 view);
     void RenderParticles(glm::mat4 projection, glm::mat4 view);
     void RenderShadowMap(const glm::vec3& mainLightDirection);
     void Shoot();
@@ -102,6 +102,7 @@ private:
     ShadowPassRenderer m_ShadowPassRenderer;
     HudRenderer m_HudRenderer;
     WeaponViewRenderer m_WeaponViewRenderer;
+    TargetRenderer m_TargetRenderer;
 
     std::map<std::string, std::unique_ptr<Model>> m_PropModels;
 

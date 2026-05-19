@@ -438,42 +438,13 @@ void GameManager::RenderScene(const glm::vec3& mainLightDirection)
                              m_ShadowMapper.get());
 
     m_SkyboxRenderer.Render(currentMap, projection, m_Camera.GetViewMatrix(), m_SkyboxRotation);
-    RenderTargets(projection, view);
+    m_TargetRenderer.Render(m_TargetManager.get(),
+                            m_Camera,
+                            m_MapManager->GetCurrentAmbientLight(),
+                            projection,
+                            view);
     RenderParticles(projection, view);
     m_WeaponViewRenderer.Render(m_Weapon.get(), m_Camera, m_ScreenWidth, m_ScreenHeight);
-}
-
-void GameManager::RenderTargets(glm::mat4 projection, glm::mat4 view)
-{
-    if (!m_TargetManager)
-        return;
-
-    ResourceManager& rm = ResourceManager::GetInstance();
-    Shader* sphereShader = rm.GetShader("sphere");
-    if (!sphereShader) return;
-
-    sphereShader->use();
-    sphereShader->setMat4("projection", projection);
-    sphereShader->setMat4("view", view);
-    sphereShader->setVec3("viewPos", m_Camera.Position);
-    sphereShader->setVec3("ambientLight", m_MapManager->GetCurrentAmbientLight());
-    sphereShader->setFloat("alpha", 1.0f);
-    sphereShader->setVec3("lightDir", glm::vec3(0.5f, 1.0f, 0.3f));
-    sphereShader->setFloat("ambientStrength", 0.4f);
-    sphereShader->setFloat("diffuseStrength", 0.6f);
-    sphereShader->setFloat("specularStrength", 0.3f);
-    sphereShader->setFloat("emissionStrength", 0.3f);
-    sphereShader->setFloat("fresnelStrength", 0.5f);
-    sphereShader->setFloat("shininess", 32.0f);
-
-    GLboolean blendEnabled = glIsEnabled(GL_BLEND);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-    m_TargetManager->Render(*sphereShader, projection, view);
-
-    if (!blendEnabled)
-        glDisable(GL_BLEND);
 }
 
 void GameManager::RenderParticles(glm::mat4 projection, glm::mat4 view)

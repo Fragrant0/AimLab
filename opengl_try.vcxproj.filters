@@ -42,6 +42,9 @@
     <ClCompile Include="src\target_manager.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="src\target_renderer.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
     <ClCompile Include="src\target_sphere.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
@@ -181,6 +184,9 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="include\target_manager.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\target_renderer.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="include\target_sphere.h">
