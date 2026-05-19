@@ -54,6 +54,9 @@
     <ClCompile Include="src\pbr_prop_renderer.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="src\shadow_pass_renderer.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
     <ClCompile Include="src\skybox_renderer.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
@@ -184,6 +187,9 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="include\pbr_prop_renderer.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\shadow_pass_renderer.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="include\skybox_renderer.h">

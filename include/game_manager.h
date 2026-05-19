@@ -33,6 +33,7 @@
 #include "ecology_system.h"
 #include "screen_shake.h"
 #include "post_process_renderer.h"
+#include "shadow_pass_renderer.h"
 #include "shadow_mapper.h"
 
 class GameManager
@@ -81,10 +82,6 @@ private:
     void RenderScoreboard(float uiScale);
     void RenderHintPanel(float uiScale);
     void RenderShadowMap(const glm::vec3& mainLightDirection);
-    void RenderShadowCasters(Shader& depthShader);
-    void RenderShadowTerrain(Shader& depthShader);
-    void RenderShadowPlane(Shader& depthShader);
-    void RenderShadowProps(Shader& depthShader);
     void Shoot();
     void SwitchMap(int mapIndex);
     void ResetGameState();
@@ -110,6 +107,7 @@ private:
     PBRPropRenderer m_PBRPropRenderer;
     SkyboxRenderer m_SkyboxRenderer;
     TerrainRenderer m_TerrainRenderer;
+    ShadowPassRenderer m_ShadowPassRenderer;
 
     std::map<std::string, std::unique_ptr<Model>> m_PropModels;
 

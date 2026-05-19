@@ -421,46 +421,15 @@ void GameManager::RenderShadowMap(const glm::vec3& mainLightDirection)
     if (!m_ShadowMapper)
         return;
 
-    m_ShadowMapper->BeginDepthPass(mainLightDirection, m_Camera);
-    Shader* depthShader = m_ShadowMapper->GetDepthShader();
-    if (depthShader)
-    {
-        depthShader->use();
-        depthShader->setMat4("lightSpaceMatrix", m_ShadowMapper->GetLightSpaceMatrix());
-        RenderShadowCasters(*depthShader);
-    }
-    m_ShadowMapper->EndDepthPass();
-}
-
-void GameManager::RenderShadowCasters(Shader& depthShader)
-{
-    const MapConfig& currentMap = m_MapManager->GetCurrentMap();
-    if (currentMap.Terrain == TerrainType::Heightmap && m_Terrain && m_Terrain->IsInitialized())
-        RenderShadowTerrain(depthShader);
-    else
-        RenderShadowPlane(depthShader);
-
-    if (m_EcologySystem && m_EcologySystem->IsReady())
-        m_EcologySystem->RenderDepth(depthShader);
-
-    RenderShadowProps(depthShader);
-}
-
-void GameManager::RenderShadowTerrain(Shader& depthShader)
-{
-    if (!m_Terrain || !m_Terrain->IsInitialized())
-        return;
-    m_TerrainRenderer.RenderDepthHeightmap(*m_Terrain, depthShader);
-}
-
-void GameManager::RenderShadowPlane(Shader& depthShader)
-{
-    m_TerrainRenderer.RenderDepthPlane(depthShader);
-}
-
-void GameManager::RenderShadowProps(Shader& depthShader)
-{
-    m_PBRPropRenderer.RenderDepth(m_MapManager->GetCurrentMap(), m_PropModels, m_Terrain.get(), depthShader);
+    m_ShadowPassRenderer.Render(*m_ShadowMapper,
+                                m_MapManager->GetCurrentMap(),
+                                m_Terrain.get(),
+                                m_EcologySystem.get(),
+                                m_TerrainRenderer,
+                                m_PBRPropRenderer,
+                                m_PropModels,
+                                m_Camera,
+                                mainLightDirection);
 }
 
 void GameManager::RenderScene()
