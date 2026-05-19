@@ -59,6 +59,9 @@ uniform float u_LightSize;
 uniform float u_ShadowBias;
 
 const float PI = 3.14159265359;
+const float PCF_FILTER_RADIUS = 1.25;
+const float PCSS_MIN_FILTER_RADIUS = 2.75;
+const float PCSS_MAX_FILTER_RADIUS = 32.0;
 
 vec2 poissonDisk[16] = vec2[](
     vec2(-0.94201624, -0.39906216), vec2(0.94558609, -0.76890725),
@@ -152,15 +155,18 @@ float CalculatePCSSShadow(vec3 N, vec3 L)
     float bias = max(u_ShadowBias * (1.0 - dot(N, L)), u_ShadowBias * 0.35);
     float receiverDepth = projCoords.z - bias;
     if (!u_PCSSEnabled)
-        return PCF(projCoords, receiverDepth, 2.0);
+        return PCF(projCoords, receiverDepth, PCF_FILTER_RADIUS);
 
-    float searchRadius = max(u_LightSize * 120.0, 1.0);
+    float searchRadius = max(u_LightSize * 220.0, 4.0);
     float avgBlockerDepth = SearchBlocker(projCoords, receiverDepth, searchRadius);
     if (avgBlockerDepth < 0.0)
         return 0.0;
 
-    float penumbra = (receiverDepth - avgBlockerDepth) / max(avgBlockerDepth, 0.0001);
-    float filterRadius = clamp(penumbra * u_LightSize * 320.0, 1.0, 18.0);
+    float penumbra = max(receiverDepth - avgBlockerDepth, 0.0) / max(avgBlockerDepth, 0.0001);
+    float lightRadius = max(u_LightSize * 900.0, 6.0);
+    float filterRadius = clamp(PCSS_MIN_FILTER_RADIUS + penumbra * lightRadius,
+                               PCSS_MIN_FILTER_RADIUS,
+                               PCSS_MAX_FILTER_RADIUS);
     return PCF(projCoords, receiverDepth, filterRadius);
 }
 
