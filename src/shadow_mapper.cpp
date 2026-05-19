@@ -7,7 +7,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 ShadowMapper::ShadowMapper()
-    : m_Size(2048),
+    : m_Size(4096),
       m_DepthFBO(0),
       m_DepthMap(0),
       m_LightSpaceMatrix(1.0f),
@@ -32,7 +32,7 @@ bool ShadowMapper::Initialize(unsigned int size)
     glGenFramebuffers(1, &m_DepthFBO);
     glGenTextures(1, &m_DepthMap);
     glBindTexture(GL_TEXTURE_2D, m_DepthMap);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, m_Size, m_Size, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, m_Size, m_Size, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
@@ -65,8 +65,8 @@ void ShadowMapper::BeginDepthPass(const glm::vec3& lightDirection, const Camera&
 {
     const glm::vec3 dir = glm::normalize(lightDirection);
     glm::vec3 center = camera.Position + camera.Front * 14.0f;
-    const float shadowDistance = 45.0f;
-    const float orthoExtent = 32.0f;
+    const float shadowDistance = 44.0f;
+    const float orthoExtent = 28.0f;
 
     glm::vec3 lightPos = center - dir * shadowDistance;
     glm::mat4 lightView = glm::lookAt(lightPos, center, glm::vec3(0.0f, 1.0f, 0.0f));

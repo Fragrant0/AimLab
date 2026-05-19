@@ -15,7 +15,7 @@ public:
     ShadowMapper();
     ~ShadowMapper();
 
-    bool Initialize(unsigned int size = 2048);
+    bool Initialize(unsigned int size = 4096);
     void Cleanup();
 
     void BeginDepthPass(const glm::vec3& lightDirection, const Camera& camera);

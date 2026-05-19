@@ -48,7 +48,8 @@ void main()
         color = texture(sceneTexture, uv).rgb;
     }
 
-    color += texture(bloomTexture, uv).rgb * bloomIntensity;
+    vec3 bloom = min(texture(bloomTexture, uv).rgb, vec3(8.0));
+    color += bloom * bloomIntensity;
 
     color *= exposure;
     color = ACESFilm(color);

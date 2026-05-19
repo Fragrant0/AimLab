@@ -156,8 +156,8 @@ void PostProcessRenderer::CreateSceneTargets()
 
 void PostProcessRenderer::CreateBloomTargets()
 {
-    m_BloomWidth = std::max(1, m_Width / 2);
-    m_BloomHeight = std::max(1, m_Height / 2);
+    m_BloomWidth = std::max(1, m_Width);
+    m_BloomHeight = std::max(1, m_Height);
 
     glGenFramebuffers(2, m_BloomFBO);
     glGenTextures(2, m_BloomColor);
@@ -219,8 +219,8 @@ unsigned int PostProcessRenderer::RenderBloomTexture(const PostProcessConfig& co
     RenderFullscreenQuad();
 
     const float radius = std::clamp(config.Bloom.Radius, 0.0f, 1.0f);
-    const int blurPairs = std::clamp(2 + static_cast<int>(std::round(radius * 6.0f)), 2, 8);
-    const float sampleRadius = 1.0f + radius * 2.0f;
+    const int blurPairs = std::clamp(2 + static_cast<int>(std::round(radius * 4.0f)), 2, 6);
+    const float sampleRadius = 1.0f + radius * 1.5f;
 
     unsigned int sourceTexture = m_BloomColor[0];
     m_BloomBlurShader->use();

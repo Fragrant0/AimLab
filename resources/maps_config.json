@@ -205,9 +205,9 @@
         "film_grain": 0.02,
         "bloom": {
           "enabled": true,
-          "threshold": 1.0,
-          "intensity": 0.04,
-          "radius": 0.65
+          "threshold": 1.35,
+          "intensity": 0.018,
+          "radius": 0.45
         }
       },
       "spawn_radius": 18.0,
