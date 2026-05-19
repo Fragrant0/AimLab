@@ -43,8 +43,8 @@
 class GameManager
 {
 public:
-    static const unsigned int SCR_WIDTH = 1920;
-    static const unsigned int SCR_HEIGHT = 1080;
+    static const unsigned int SCR_WIDTH = 1600;
+    static const unsigned int SCR_HEIGHT = 900;
 
     GameManager();
     ~GameManager();

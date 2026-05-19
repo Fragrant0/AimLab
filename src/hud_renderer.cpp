@@ -17,18 +17,18 @@
 namespace UILayout
 {
     constexpr float SCORE_MARGIN = 30.0f;
-    constexpr float SCORE_COLUMN_GAP = -50.0f;
-    constexpr float SCORE_ROW_GAP = 5.0f;
+    constexpr float SCORE_COLUMN_GAP = 14.0f;
+    constexpr float SCORE_ROW_GAP = 4.0f;
     constexpr float HINT_MARGIN = 30.0f;
     constexpr float HINT_COLUMN_GAP = 15.0f;
     constexpr float HINT_ROW_GAP = 5.0f;
     constexpr float HINT_TOP_OFFSET = 5.0f;
-    constexpr int SCORE_RESERVED_DIGITS = 2;
+    constexpr int SCORE_RESERVED_DIGITS = 6;
 
-    constexpr float SCORE_FONT_SCALE = 0.92f;
-    constexpr float COMBO_FONT_SCALE = 0.74f;
-    constexpr float HINT_FONT_SCALE = 0.42f;
-    constexpr float BEST_FONT_SCALE = 0.58f;
+    constexpr float SCORE_FONT_SCALE = 0.72f;
+    constexpr float COMBO_FONT_SCALE = 0.62f;
+    constexpr float HINT_FONT_SCALE = 0.50f;
+    constexpr float BEST_FONT_SCALE = 0.50f;
 
     constexpr float COMBO_BAR_WIDTH = 100.0f;
     constexpr float COMBO_BAR_HEIGHT = 3.0f;
@@ -40,10 +40,10 @@ namespace UILayout
     constexpr float CROSSHAIR_GAP = 4.0f;
     constexpr float CROSSHAIR_THICKNESS = 2.0f;
 
-    constexpr float DEBUG_PANEL_WIDTH = 300.0f;
-    constexpr float DEBUG_PANEL_HEIGHT = 128.0f;
+    constexpr float DEBUG_PANEL_WIDTH = 360.0f;
+    constexpr float DEBUG_PANEL_HEIGHT = 150.0f;
     constexpr float DEBUG_PANEL_PADDING = 6.0f;
-    constexpr float DEBUG_FONT_SCALE = 0.25f;
+    constexpr float DEBUG_FONT_SCALE = 0.30f;
     constexpr float DEBUG_ROW_GAP = 1.0f;
 }
 
@@ -213,14 +213,7 @@ void HudRenderer::RenderScoreboard(UIRenderer& uiRenderer,
                     kScoreTextColor, kScoreTextColor});
 
     float comboScale = UILayout::COMBO_FONT_SCALE * uiScale;
-    float maxLabelWidth = 0.0f;
-    float maxValueWidth = 0.0f;
     const std::string reservedValueText(UILayout::SCORE_RESERVED_DIGITS, '0');
-    for (const auto& row : rows)
-    {
-        maxLabelWidth = std::max(maxLabelWidth, fontRenderer.GetTextWidth(row.scale, row.label));
-        maxValueWidth = std::max(maxValueWidth, fontRenderer.GetTextWidth(row.scale, reservedValueText));
-    }
 
     std::string comboText;
     float comboTextWidth = 0.0f;
@@ -231,8 +224,22 @@ void HudRenderer::RenderScoreboard(UIRenderer& uiRenderer,
         comboTextWidth = fontRenderer.GetTextWidth(comboScale, comboText);
     }
 
-    const float panelWidth = std::max(maxLabelWidth + columnGap + maxValueWidth,
-                                      std::max(comboTextWidth, comboBarWidth));
+    auto getValueWidth = [&](const ScoreboardRow& row) {
+        return std::max(fontRenderer.GetTextWidth(row.scale, row.value),
+                        fontRenderer.GetTextWidth(row.scale, reservedValueText));
+    };
+
+    auto getPanelWidth = [&]() {
+        float width = std::max(comboTextWidth, comboBarWidth);
+        for (const auto& row : rows)
+        {
+            const float labelWidth = fontRenderer.GetTextWidth(row.scale, row.label);
+            width = std::max(width, labelWidth + columnGap + getValueWidth(row));
+        }
+        return width;
+    };
+
+    const float panelWidth = getPanelWidth();
     const float availableWidth = std::max(1.0f, w - margin * 2.0f);
     if (panelWidth > availableWidth)
     {
@@ -242,28 +249,21 @@ void HudRenderer::RenderScoreboard(UIRenderer& uiRenderer,
         comboScale *= shrink;
         comboBarWidth *= shrink;
 
-        maxLabelWidth = 0.0f;
-        maxValueWidth = 0.0f;
-        for (const auto& row : rows)
-        {
-            maxLabelWidth = std::max(maxLabelWidth, fontRenderer.GetTextWidth(row.scale, row.label));
-            maxValueWidth = std::max(maxValueWidth, fontRenderer.GetTextWidth(row.scale, reservedValueText));
-        }
-
         if (!comboText.empty())
             comboTextWidth = fontRenderer.GetTextWidth(comboScale, comboText);
     }
 
     const float valueRightX = UIUtils::SnapToPixel(w - margin);
-    const float labelRightX = UIUtils::SnapToPixel(valueRightX - maxValueWidth - columnGap);
-    const float labelLeftX = UIUtils::SnapToPixel(labelRightX - maxLabelWidth);
-    const float valueLeftX = UIUtils::SnapToPixel(valueRightX - maxValueWidth);
     float currentTop = UIUtils::SnapToPixel(h - margin);
 
     for (const auto& row : rows)
     {
         const float lineHeight = UIUtils::SnapToPixel(fontRenderer.GetLineHeight(row.scale));
         const float textY = UIUtils::SnapToPixel(currentTop - lineHeight);
+        const float labelWidth = fontRenderer.GetTextWidth(row.scale, row.label);
+        const float valueWidth = fontRenderer.GetTextWidth(row.scale, row.value);
+        const float valueLeftX = UIUtils::SnapToPixel(valueRightX - valueWidth);
+        const float labelLeftX = UIUtils::SnapToPixel(valueLeftX - columnGap - labelWidth);
 
         fontRenderer.DrawText(labelLeftX, textY,
                               row.scale, row.label, row.labelColor);
@@ -278,14 +278,13 @@ void HudRenderer::RenderScoreboard(UIRenderer& uiRenderer,
 
     const float comboLineHeight = UIUtils::SnapToPixel(fontRenderer.GetLineHeight(comboScale));
     const float comboY = UIUtils::SnapToPixel(currentTop - comboLineHeight);
-    const float comboX = valueLeftX;
+    const float comboX = UIUtils::SnapToPixel(valueRightX - comboTextWidth);
 
     fontRenderer.DrawText(comboX, comboY, comboScale, comboText, kComboTextColor);
 
     const float comboBarHeight = std::max(2.0f, UIUtils::ScaleToScreen(UILayout::COMBO_BAR_HEIGHT, uiScale));
     const float comboVisualWidth = comboBarWidth;
-    const float valueColumnCenterX = valueLeftX + maxValueWidth * 0.5f;
-    float comboBarX = UIUtils::SnapToPixel(valueColumnCenterX - comboVisualWidth * 0.5f);
+    float comboBarX = UIUtils::SnapToPixel(valueRightX - comboVisualWidth);
     comboBarX = std::max(margin, std::min(comboBarX, w - margin - comboVisualWidth));
     const float comboBarY = UIUtils::SnapToPixel(comboY - comboBarHeight - std::max(2.0f, rowGap * 0.5f));
     float comboProgress = 1.0f - scoreSystem.GetComboTimer() / ScoreSystem::COMBO_TIMEOUT;

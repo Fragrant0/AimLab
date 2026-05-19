@@ -1,6 +1,7 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
+#include <algorithm>
 #include <iostream>
 
 #include "game_manager.h"
@@ -22,12 +23,30 @@ int main()
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #endif
 
-    GLFWwindow* window = glfwCreateWindow(GameManager::SCR_WIDTH, GameManager::SCR_HEIGHT, "FPS Game", NULL, NULL);
+    int windowWidth = static_cast<int>(GameManager::SCR_WIDTH);
+    int windowHeight = static_cast<int>(GameManager::SCR_HEIGHT);
+    GLFWmonitor* primaryMonitor = glfwGetPrimaryMonitor();
+    const GLFWvidmode* videoMode = primaryMonitor ? glfwGetVideoMode(primaryMonitor) : nullptr;
+    if (videoMode)
+    {
+        windowWidth = std::min(windowWidth, std::max(640, videoMode->width - 120));
+        windowHeight = std::min(windowHeight, std::max(360, videoMode->height - 120));
+        windowHeight = std::min(windowHeight, static_cast<int>(windowWidth * 9.0f / 16.0f));
+        windowWidth = static_cast<int>(windowHeight * 16.0f / 9.0f);
+    }
+
+    GLFWwindow* window = glfwCreateWindow(windowWidth, windowHeight, "FPS Game", NULL, NULL);
     if (window == NULL)
     {
         std::cout << "Failed to create GLFW window" << std::endl;
         glfwTerminate();
         return -1;
+    }
+    if (videoMode)
+    {
+        glfwSetWindowPos(window,
+                         videoMode->width / 2 - windowWidth / 2,
+                         videoMode->height / 2 - windowHeight / 2);
     }
     glfwMakeContextCurrent(window);
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);

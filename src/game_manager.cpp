@@ -52,6 +52,18 @@ bool GameManager::Initialize(GLFWwindow* window)
 {
     m_Window = window;
 
+    int framebufferWidth = 0;
+    int framebufferHeight = 0;
+    glfwGetFramebufferSize(window, &framebufferWidth, &framebufferHeight);
+    if (framebufferWidth > 0 && framebufferHeight > 0)
+    {
+        m_ScreenWidth = framebufferWidth;
+        m_ScreenHeight = framebufferHeight;
+        m_LastX = framebufferWidth * 0.5f;
+        m_LastY = framebufferHeight * 0.5f;
+        glViewport(0, 0, framebufferWidth, framebufferHeight);
+    }
+
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
 
