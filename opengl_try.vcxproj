@@ -144,6 +144,7 @@
     <ClCompile Include="src\target_sphere.cpp" />
     <ClCompile Include="src\raycast.cpp" />
     <ClCompile Include="src\score_system.cpp" />
+    <ClCompile Include="src\particle_renderer.cpp" />
     <ClCompile Include="src\particle_system.cpp" />
     <ClCompile Include="src\pbr_prop_renderer.cpp" />
     <ClCompile Include="src\shadow_pass_renderer.cpp" />
@@ -213,6 +214,7 @@
     <ClInclude Include="include\target_sphere.h" />
     <ClInclude Include="include\raycast.h" />
     <ClInclude Include="include\score_system.h" />
+    <ClInclude Include="include\particle_renderer.h" />
     <ClInclude Include="include\particle_system.h" />
     <ClInclude Include="include\pbr_prop_renderer.h" />
     <ClInclude Include="include\shadow_pass_renderer.h" />

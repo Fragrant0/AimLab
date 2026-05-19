@@ -21,6 +21,7 @@
 #include "raycast.h"
 #include "score_system.h"
 #include "particle_system.h"
+#include "particle_renderer.h"
 #include "pbr_prop_renderer.h"
 #include "skybox_renderer.h"
 #include "weapon.h"
@@ -73,7 +74,6 @@ private:
     void LoadMapResources();
     void UnloadMapResources(int mapIndex);
     void RenderScene(const glm::vec3& mainLightDirection);
-    void RenderParticles(glm::mat4 projection, glm::mat4 view);
     void RenderShadowMap(const glm::vec3& mainLightDirection);
     void Shoot();
     void SwitchMap(int mapIndex);
@@ -103,6 +103,7 @@ private:
     HudRenderer m_HudRenderer;
     WeaponViewRenderer m_WeaponViewRenderer;
     TargetRenderer m_TargetRenderer;
+    ParticleRenderer m_ParticleRenderer;
 
     std::map<std::string, std::unique_ptr<Model>> m_PropModels;
 

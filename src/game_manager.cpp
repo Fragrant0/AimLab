@@ -443,20 +443,8 @@ void GameManager::RenderScene(const glm::vec3& mainLightDirection)
                             m_MapManager->GetCurrentAmbientLight(),
                             projection,
                             view);
-    RenderParticles(projection, view);
+    m_ParticleRenderer.Render(m_ParticleSystem.get(), projection, view);
     m_WeaponViewRenderer.Render(m_Weapon.get(), m_Camera, m_ScreenWidth, m_ScreenHeight);
-}
-
-void GameManager::RenderParticles(glm::mat4 projection, glm::mat4 view)
-{
-    if (!m_ParticleSystem)
-        return;
-
-    ResourceManager& rm = ResourceManager::GetInstance();
-    Shader* particleShader = rm.GetShader("particle");
-    if (!particleShader) return;
-
-    m_ParticleSystem->Render(*particleShader, projection, view);
 }
 
 void GameManager::Cleanup()
