@@ -22,7 +22,7 @@ void main()
     {
         float coreFade = 1.0 - smoothstep(0.0, coreRadius, dist);
         alpha = coreFade * 0.8;
-        finalColor = mix(vec3(1.0, 0.8, 0.3), ParticleColor.rgb, dist * 2.0); // ÖÐÐÄÆ«³È»Æ
+        finalColor = mix(vec3(1.0, 0.8, 0.3), ParticleColor.rgb, dist * 2.0);
     }
     else if (dist < midRadius)
     {

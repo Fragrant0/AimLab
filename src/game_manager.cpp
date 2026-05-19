@@ -1,4 +1,4 @@
-﻿#include "game_manager.h"
+#include "game_manager.h"
 #include "gl_state_guard.h"
 #include "render_settings.h"
 
