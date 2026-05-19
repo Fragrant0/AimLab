@@ -30,6 +30,9 @@
     <ClCompile Include="src\game_manager.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="src\hud_renderer.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
     <ClCompile Include="src\resource_manager.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
@@ -163,6 +166,9 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="include\game_manager.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\hud_renderer.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="include\resource_manager.h">

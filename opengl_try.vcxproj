@@ -136,6 +136,7 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="src\ecology_system.cpp" />
     <ClCompile Include="src\game_manager.cpp" />
+    <ClCompile Include="src\hud_renderer.cpp" />
     <ClCompile Include="src\resource_manager.cpp" />
     <ClCompile Include="src\sphere_mesh.cpp" />
     <ClCompile Include="src\target_manager.cpp" />
@@ -196,6 +197,7 @@
     <ClInclude Include="include\camera.h" />
     <ClInclude Include="include\ecology_system.h" />
     <ClInclude Include="include\game_manager.h" />
+    <ClInclude Include="include\hud_renderer.h" />
     <ClInclude Include="include\mesh.h" />
     <ClInclude Include="include\model.h" />
     <ClInclude Include="include\nlohmann\json.hpp" />

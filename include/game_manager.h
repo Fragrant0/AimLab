@@ -27,6 +27,7 @@
 #include "map_resource_loader.h"
 #include "ui_renderer.h"
 #include "font_renderer.h"
+#include "hud_renderer.h"
 #include "hit_feedback.h"
 #include "terrain.h"
 #include "terrain_renderer.h"
@@ -73,17 +74,12 @@ private:
     void RenderTargets(glm::mat4 projection, glm::mat4 view);
     void RenderParticles(glm::mat4 projection, glm::mat4 view);
     void RenderWeapon(glm::mat4 projection, glm::mat4 view);
-    void RenderUI();
-    void RenderCenterOverlay(float uiScale);
-    void RenderScoreboard(float uiScale);
-    void RenderHintPanel(float uiScale);
     void RenderShadowMap(const glm::vec3& mainLightDirection);
     void Shoot();
     void SwitchMap(int mapIndex);
     void ResetGameState();
     void ClampPlayerToTerrain();
     void ToggleWireframe();
-    float GetUIScale() const;
 
     glm::vec2 WorldToScreen(const glm::vec3& worldPos, const glm::mat4& projection, const glm::mat4& view);
     glm::vec3 GetRotatedMainLightDirection() const;
@@ -104,6 +100,7 @@ private:
     SkyboxRenderer m_SkyboxRenderer;
     TerrainRenderer m_TerrainRenderer;
     ShadowPassRenderer m_ShadowPassRenderer;
+    HudRenderer m_HudRenderer;
 
     std::map<std::string, std::unique_ptr<Model>> m_PropModels;
 
