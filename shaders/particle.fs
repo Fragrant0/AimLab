@@ -12,30 +12,24 @@ void main()
     if (dist > 0.5)
         discard;
 
-    float coreRadius = 0.12;
-    float midRadius = 0.3;
-
-    float alpha;
-    vec3 finalColor;
-
-    if (dist < coreRadius)
-    {
-        float coreFade = 1.0 - smoothstep(0.0, coreRadius, dist);
-        alpha = coreFade * 0.8;
-        finalColor = mix(vec3(1.0, 0.8, 0.3), ParticleColor.rgb, dist * 2.0);
-    }
-    else if (dist < midRadius)
-    {
-        float midFade = 1.0 - smoothstep(coreRadius, midRadius, dist);
-        alpha = midFade * 0.6;
-        finalColor = ParticleColor.rgb * 0.9;
-    }
-    else
-    {
-        float outerFade = 1.0 - smoothstep(midRadius, 0.5, dist);
-        alpha = outerFade * 0.3;
-        finalColor = ParticleColor.rgb * 0.7;
-    }
-
-    FragColor = vec4(finalColor, ParticleColor.a * alpha);
+    // Smooth radial gradient for a glowing particle
+    float t = dist / 0.5; // 0.0 at center, 1.0 at edge
+    
+    // Color interpolation: bright white-yellow core, transitioning to rich orange-red spark color
+    vec3 coreColor = vec3(1.0, 0.95, 0.85);
+    vec3 baseColor = ParticleColor.rgb;
+    
+    // Smooth transition from core to base color
+    vec3 color = mix(coreColor, baseColor, smoothstep(0.1, 0.45, dist));
+    
+    // Glow falloff function: steep drop close to center, soft tail
+    float coreGlow = exp(-dist * 12.0) * 2.0; 
+    float outerGlow = pow(1.0 - t, 2.5);
+    float glow = outerGlow + coreGlow;
+    
+    // Calculate final alpha
+    float alpha = outerGlow * 1.2; // fade out to 0 at the edge
+    
+    // Additive output
+    FragColor = vec4(color * glow * 1.5, ParticleColor.a * alpha);
 }

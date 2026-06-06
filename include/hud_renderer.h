@@ -21,10 +21,13 @@ struct DebugOverlayState
 {
     bool Visible = false;
     bool PostEffectsEnabled = true;
-    bool BloomEnabled = true;
     bool IBLEnabled = true;
     bool PCSSEnabled = true;
+    bool PixelateEnabled = false;
+    bool UnderwaterEnabled = false;
     bool WireframeEnabled = false;
+    bool FreeFlyEnabled = false;
+    int FPS = 0;
     int SelectedParameter = 0;
     PostProcessConfig PostProcess;
     glm::vec3 MainLightDirection = glm::vec3(0.0f, -1.0f, 0.0f);

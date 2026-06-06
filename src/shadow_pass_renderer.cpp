@@ -8,6 +8,7 @@
 #include "shadow_mapper.h"
 #include "terrain.h"
 #include "terrain_renderer.h"
+#include "resource_manager.h"
 
 void ShadowPassRenderer::Render(ShadowMapper& shadowMapper,
                                 const MapConfig& map,
@@ -30,7 +31,16 @@ void ShadowPassRenderer::Render(ShadowMapper& shadowMapper,
         RenderTerrainCasters(map, terrain, terrainRenderer, *depthShader);
 
         if (ecologySystem && ecologySystem->IsReady())
-            ecologySystem->RenderDepth(*depthShader);
+        {
+            ResourceManager& rm = ResourceManager::GetInstance();
+            Shader* instancedDepthShader = rm.GetShader("ecology_shadow_depth");
+            if (instancedDepthShader)
+            {
+                instancedDepthShader->use();
+                instancedDepthShader->setMat4("lightSpaceMatrix", shadowMapper.GetLightSpaceMatrix());
+                ecologySystem->RenderDepth(*instancedDepthShader);
+            }
+        }
 
         propRenderer.RenderDepth(map, propModels, terrain, *depthShader);
     }

@@ -64,9 +64,20 @@ void ShadowMapper::Cleanup()
 void ShadowMapper::BeginDepthPass(const glm::vec3& lightDirection, const Camera& camera)
 {
     const glm::vec3 dir = glm::normalize(lightDirection);
-    glm::vec3 center = camera.Position + camera.Front * 14.0f;
-    const float shadowDistance = 44.0f;
-    const float orthoExtent = 28.0f;
+    
+    // Project view direction to horizontal XZ plane, preventing shadow box drifting up/down
+    glm::vec3 horizontalFront = camera.Front;
+    if (std::abs(horizontalFront.x) > 0.001f || std::abs(horizontalFront.z) > 0.001f)
+    {
+        horizontalFront = glm::normalize(glm::vec3(horizontalFront.x, 0.0f, horizontalFront.z));
+    }
+    
+    // Position the shadow box center 10 meters in front of the camera at ground/feet level
+    glm::vec3 center = camera.Position + horizontalFront * 10.0f;
+    center.y = camera.Position.y - 1.5f;
+
+    const float shadowDistance = 30.0f;
+    const float orthoExtent = 16.0f;
 
     glm::vec3 lightPos = center - dir * shadowDistance;
     glm::mat4 lightView = glm::lookAt(lightPos, center, glm::vec3(0.0f, 1.0f, 0.0f));

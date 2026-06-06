@@ -33,24 +33,12 @@ struct LightingConfig
     std::vector<PointLightConfig> PointLights;
 };
 
-struct BloomConfig
-{
-    bool Enabled = true;
-    float Threshold = 1.0f;
-    float Intensity = 0.25f;
-    float Radius = 0.6f;
-};
-
 struct PostProcessConfig
 {
-    float Exposure = 1.0f;
     float Gamma = 2.2f;
-    float Contrast = 1.0f;
-    float Saturation = 1.0f;
-    float Vignette = 0.15f;
-    float ChromaticAberration = 0.0f;
-    float FilmGrain = 0.0f;
-    BloomConfig Bloom;
+    bool PixelateEnabled = false;
+    float PixelSize = 4.0f;
+    bool UnderwaterEnabled = false;
 };
 
 #endif

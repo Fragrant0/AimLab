@@ -44,8 +44,9 @@ void main()
 
     vec3 coreColor = vec3(1.0, 1.0, 0.9);
     vec3 outerColor = flashColor;
-    vec3 finalColor = mix(coreColor, outerColor, dist * 2.0);
+    vec3 finalColor = mix(coreColor, outerColor, clamp(dist * 2.0, 0.0, 1.0));
     finalColor *= intensity * (1.0 + (1.0 - LifeRatio) * 2.0);
+    finalColor *= alpha; // Premultiply color by alpha to prevent square artifacts under additive blending
 
     FragColor = vec4(finalColor, alpha);
 }

@@ -1,77 +1,178 @@
 {
   "maps": [
     {
-      "name": "Space",
+      "name": "Ocean",
       "skybox_type": "hdr",
-      "skybox_hdr": "resources/textures/skybox_hdr/rogland_clear_night_1k.hdr",
-      "floor_texture": "resources/textures/ground/space_aerial_rocks_02_diff_1k.jpg",
-      "floor_texture_name": "floor_space",
-      "ambient_color": [0.1, 0.1, 0.2],
-      "ambient_intensity": 0.24,
+      "skybox_hdr": "resources/textures/skybox_hdr/underwater_hdr.hdr",
+      "floor_texture": "resources/textures/ground/sand.jpg",
+      "floor_texture_name": "floor_ocean",
+      "ambient_color": [
+        0.08,
+        0.22,
+        0.35
+      ],
+      "ambient_intensity": 0.95,
       "lighting": {
         "main_light": {
-          "direction": [-0.25, -0.85, -0.35],
-          "color": [0.72, 0.82, 1.0],
-          "intensity": 0.72,
-          "sync_with_skybox_rotation": true,
+          "direction": [
+            -0.1,
+            -0.98,
+            -0.1
+          ],
+          "color": [
+            0.45,
+            0.85,
+            0.95
+          ],
+          "intensity": 1.0,
+          "sync_with_skybox_rotation": false,
           "skybox_rotation_offset": 0.0,
-          "angular_size": 0.065
+          "angular_size": 0.12
         },
         "ambient": {
-          "ibl_diffuse_intensity": 0.35,
-          "ibl_specular_intensity": 0.58,
-          "ambient_intensity": 0.24
+          "ibl_diffuse_intensity": 0.5,
+          "ibl_specular_intensity": 0.65,
+          "ambient_intensity": 0.95
         },
         "point_lights": [
           {
-            "position": [4.0, 4.0, -7.0],
-            "color": [0.2, 0.75, 1.0],
-            "intensity": 1.7,
-            "range": 12.0
+            "position": [
+              5.0,
+              2.0,
+              -8.0
+            ],
+            "color": [
+              0.1,
+              0.8,
+              0.6
+            ],
+            "intensity": 1.2,
+            "range": 15.0
           },
           {
-            "position": [-4.0, 2.8, -5.0],
-            "color": [1.0, 0.35, 0.2],
-            "intensity": 1.1,
-            "range": 9.0
+            "position": [
+              -5.0,
+              1.5,
+              -6.0
+            ],
+            "color": [
+              0.0,
+              0.5,
+              0.9
+            ],
+            "intensity": 1.0,
+            "range": 12.0
           }
         ]
       },
       "post_process": {
-        "exposure": 0.62,
         "gamma": 2.2,
-        "contrast": 1.08,
-        "saturation": 1.05,
-        "vignette": 0.2,
-        "chromatic_aberration": 0.0012,
-        "film_grain": 0.015,
-        "bloom": {
-          "enabled": true,
-          "threshold": 1.0,
-          "intensity": 0.03,
-          "radius": 0.6
-        }
+        "pixelate_enabled": false,
+        "pixel_size": 4.0,
+        "underwater_enabled": true
       },
       "spawn_radius": 24.0,
       "terrain": "heightmap",
-      "ecology_enabled": false,
+      "ecology_enabled": true,
       "heightmap": {
-        "path": "resources/textures/heightmaps/rocky_peaks_height.png",
-        "height_scale": 18.0,
+        "path": "resources/textures/heightmaps/seabed_heightmap.png",
+        "height_scale": 4.0,
         "grid_size": 256,
-        "size": 70.0
+        "size": 60.0
       },
-      "player_start": [0.0, 3.0, 8.0],
+      "player_start": [
+        0.0,
+        1.5,
+        8.0
+      ],
       "props": [
         {
-          "model": "resources/objects/scifi_helmet/SciFiHelmet.gltf",
-          "position": [0.0, 0.35, -12.0],
-          "rotation": [0.0, 180.0, 0.0],
-          "scale": 1.0,
+          "model": "resources/objects/fish/BarramundiFish.gltf",
+          "position": [
+            6.0,
+            2.2,
+            -12.0
+          ],
+          "rotation": [
+            0.0,
+            45.0,
+            0.0
+          ],
+          "scale": 1.5,
+          "target_height": 2.2,
+          "pbr_brightness": 1.15,
+          "pbr_ambient_intensity": 0.6,
+          "pbr_ambient_color": [
+            0.45,
+            0.85,
+            0.95
+          ]
+        },
+        {
+          "model": "resources/objects/fish/BarramundiFish.gltf",
+          "position": [
+            -8.0,
+            3.0,
+            -20.0
+          ],
+          "rotation": [
+            0.0,
+            -30.0,
+            0.0
+          ],
+          "scale": 1.8,
           "target_height": 3.0,
-          "pbr_brightness": 1.12,
-          "pbr_ambient_intensity": 0.48,
-          "pbr_ambient_color": [0.78, 0.9, 1.0]
+          "pbr_brightness": 1.15,
+          "pbr_ambient_intensity": 0.6,
+          "pbr_ambient_color": [
+            0.45,
+            0.85,
+            0.95
+          ]
+        },
+        {
+          "model": "resources/objects/fish/BarramundiFish.gltf",
+          "position": [
+            3.0,
+            4.5,
+            -30.0
+          ],
+          "rotation": [
+            0.0,
+            90.0,
+            0.0
+          ],
+          "scale": 2.0,
+          "target_height": 4.5,
+          "pbr_brightness": 1.15,
+          "pbr_ambient_intensity": 0.6,
+          "pbr_ambient_color": [
+            0.45,
+            0.85,
+            0.95
+          ]
+        },
+        {
+          "model": "resources/objects/fish/BarramundiFish.gltf",
+          "position": [
+            -12.0,
+            1.5,
+            -8.0
+          ],
+          "rotation": [
+            0.0,
+            120.0,
+            0.0
+          ],
+          "scale": 1.3,
+          "target_height": 1.5,
+          "pbr_brightness": 1.15,
+          "pbr_ambient_intensity": 0.6,
+          "pbr_ambient_color": [
+            0.45,
+            0.85,
+            0.95
+          ]
         }
       ],
       "target_area": {
@@ -86,18 +187,30 @@
       "name": "Nature",
       "skybox_type": "hdr",
       "skybox_hdr": "resources/textures/skybox_hdr/citrus_orchard_road_puresky_1k.hdr",
-      "floor_texture": "resources/textures/terrain/nature_rocky_peaks_diffuse.png",
+      "floor_texture": "resources/textures/ground/nature_rocky_peaks_diffuse.png",
       "floor_texture_name": "floor_nature",
-      "ambient_color": [0.2, 0.3, 0.2],
+      "ambient_color": [
+        0.2,
+        0.3,
+        0.2
+      ],
       "ambient_intensity": 0.24,
       "lighting": {
         "main_light": {
-          "direction": [-0.42, -0.88, -0.18],
-          "color": [1.0, 0.92, 0.72],
+          "direction": [
+            -0.42,
+            -0.88,
+            -0.18
+          ],
+          "color": [
+            1.0,
+            0.92,
+            0.72
+          ],
           "intensity": 0.72,
-          "sync_with_skybox_rotation": true,
+          "sync_with_skybox_rotation": false,
           "skybox_rotation_offset": 0.25,
-          "angular_size": 0.045
+          "angular_size": 0.1
         },
         "ambient": {
           "ibl_diffuse_intensity": 0.38,
@@ -106,8 +219,16 @@
         },
         "point_lights": [
           {
-            "position": [6.0, 34.0, -7.0],
-            "color": [1.0, 0.68, 0.35],
+            "position": [
+              6.0,
+              34.0,
+              -7.0
+            ],
+            "color": [
+              1.0,
+              0.68,
+              0.35
+            ],
             "intensity": 1.35,
             "range": 13.0
           }
@@ -116,15 +237,13 @@
       "post_process": {
         "exposure": 0.62,
         "gamma": 2.2,
-        "contrast": 1.08,
-        "saturation": 1.06,
-        "vignette": 0.14,
-        "chromatic_aberration": 0.0,
-        "film_grain": 0.006,
+        "contrast": 1.02,
+        "saturation": 1.02,
+        "vignette": 0.08,
         "bloom": {
           "enabled": true,
           "threshold": 1.0,
-          "intensity": 0.02,
+          "intensity": 0.018,
           "radius": 0.5
         }
       },
@@ -137,17 +256,33 @@
         "grid_size": 256,
         "size": 60.0
       },
-      "player_start": [0.0, 3.0, 5.0],
+      "player_start": [
+        0.0,
+        3.0,
+        5.0
+      ],
       "props": [
         {
-          "model": "resources/objects/avocado/Avocado.gltf",
-          "position": [0.0, 0.35, -10.0],
-          "rotation": [0.0, 30.0, 0.0],
+          "model": "resources/objects/boombox/BoomBox.gltf",
+          "position": [
+            6.0,
+            0.0,
+            7.5
+          ],
+          "rotation": [
+            0.0,
+            30.0,
+            0.0
+          ],
           "scale": 1.0,
-          "target_height": 2.2,
-          "pbr_brightness": 1.08,
+          "target_height": 1.3,
+          "pbr_brightness": 1.12,
           "pbr_ambient_intensity": 0.55,
-          "pbr_ambient_color": [1.0, 0.92, 0.76]
+          "pbr_ambient_color": [
+            1.0,
+            0.92,
+            0.76
+          ]
         }
       ],
       "target_area": {
@@ -159,77 +294,170 @@
       }
     },
     {
-      "name": "City",
+      "name": "Crater Base",
       "skybox_type": "hdr",
-      "skybox_hdr": "resources/textures/skybox_hdr/urban_street_04_1k.hdr",
-      "floor_texture": "resources/textures/ground/city_asphalt_02_diff_1k.jpg",
-      "floor_texture_name": "floor_city",
-      "ambient_color": [0.3, 0.3, 0.3],
-      "ambient_intensity": 0.22,
+      "skybox_hdr": "resources/textures/skybox_hdr/qwantani_night_puresky_1k.hdr",
+      "floor_texture": "resources/textures/ground/brown_mud_02_diff_1k.png",
+      "floor_texture_name": "floor_mud",
+      "ambient_color": [
+        0.12,
+        0.15,
+        0.25
+      ],
+      "ambient_intensity": 0.55,
       "lighting": {
         "main_light": {
-          "direction": [-0.15, -0.72, -0.65],
-          "color": [0.86, 0.92, 1.0],
-          "intensity": 0.68,
-          "sync_with_skybox_rotation": true,
-          "skybox_rotation_offset": -0.35,
-          "angular_size": 0.08
+          "direction": [
+            -0.3,
+            -0.9,
+            -0.3
+          ],
+          "color": [
+            0.75,
+            0.85,
+            1.0
+          ],
+          "intensity": 1.4,
+          "sync_with_skybox_rotation": false,
+          "skybox_rotation_offset": 0.0,
+          "angular_size": 0.15
         },
         "ambient": {
-          "ibl_diffuse_intensity": 0.3,
-          "ibl_specular_intensity": 0.58,
-          "ambient_intensity": 0.22
+          "ibl_diffuse_intensity": 0.45,
+          "ibl_specular_intensity": 0.6,
+          "ambient_intensity": 0.55
         },
         "point_lights": [
           {
-            "position": [3.5, 2.8, -6.0],
-            "color": [1.0, 0.44, 0.18],
-            "intensity": 1.8,
-            "range": 9.0
+            "position": [
+              5.0,
+              1.5,
+              -8.0
+            ],
+            "color": [
+              0.0,
+              0.85,
+              1.0
+            ],
+            "intensity": 3.5,
+            "range": 22.0
           },
           {
-            "position": [-3.5, 2.6, -6.5],
-            "color": [0.15, 0.45, 1.0],
-            "intensity": 1.6,
-            "range": 9.0
+            "position": [
+              -5.0,
+              1.8,
+              -10.0
+            ],
+            "color": [
+              1.0,
+              0.0,
+              0.85
+            ],
+            "intensity": 3.5,
+            "range": 22.0
+          },
+          {
+            "position": [
+              0.0,
+              2.5,
+              -14.0
+            ],
+            "color": [
+              1.0,
+              0.45,
+              0.0
+            ],
+            "intensity": 4.0,
+            "range": 25.0
           }
         ]
       },
       "post_process": {
-        "exposure": 0.62,
         "gamma": 2.2,
-        "contrast": 1.1,
-        "saturation": 1.03,
-        "vignette": 0.24,
-        "chromatic_aberration": 0.0018,
-        "film_grain": 0.02,
-        "bloom": {
-          "enabled": true,
-          "threshold": 1.35,
-          "intensity": 0.018,
-          "radius": 0.45
-        }
+        "pixelate_enabled": false,
+        "pixel_size": 4.0,
+        "underwater_enabled": false
       },
       "spawn_radius": 18.0,
       "terrain": "heightmap",
-      "ecology_enabled": false,
+      "ecology_enabled": true,
       "heightmap": {
-        "path": "resources/textures/heightmaps/rocky_peaks_height.png",
-        "height_scale": 3.0,
+        "path": "resources/textures/heightmaps/crater_heightmap.png",
+        "height_scale": 14.0,
         "grid_size": 256,
-        "size": 48.0
+        "size": 65.0
       },
-      "player_start": [0.0, 3.0, 6.0],
+      "player_start": [
+        0.0,
+        5.0,
+        10.0
+      ],
       "props": [
         {
-          "model": "resources/objects/boombox/BoomBox.gltf",
-          "position": [0.0, 0.18, -7.0],
-          "rotation": [0.0, 205.0, 0.0],
+          "model": "resources/objects/ufo_flying_saucer_spaceship_ovni/scene.gltf",
+          "position": [
+            0.0,
+            5.0,
+            -12.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "scale": 0.15,
+          "target_height": 5.0,
+          "pbr_brightness": 1.2,
+          "pbr_ambient_intensity": 0.4,
+          "pbr_ambient_color": [
+            1.0,
+            0.45,
+            0.0
+          ]
+        },
+        {
+          "model": "resources/objects/light_fighter_spaceship_-_free_-/scene.gltf",
+          "position": [
+            4.8,
+            3.2,
+            -8.0
+          ],
+          "rotation": [
+            0.0,
+            45.0,
+            0.0
+          ],
           "scale": 1.0,
-          "target_height": 2.2,
-          "pbr_brightness": 1.1,
-          "pbr_ambient_intensity": 0.5,
-          "pbr_ambient_color": [0.9, 0.95, 1.0]
+          "target_height": 1.5,
+          "pbr_brightness": 1.2,
+          "pbr_ambient_intensity": 0.4,
+          "pbr_ambient_color": [
+            0.0,
+            0.85,
+            1.0
+          ]
+        },
+        {
+          "model": "resources/objects/light_fighter_spaceship_-_free_-/scene.gltf",
+          "position": [
+            -4.8,
+            3.5,
+            -10.0
+          ],
+          "rotation": [
+            0.0,
+            -45.0,
+            0.0
+          ],
+          "scale": 1.0,
+          "target_height": 1.8,
+          "pbr_brightness": 1.2,
+          "pbr_ambient_intensity": 0.4,
+          "pbr_ambient_color": [
+            1.0,
+            0.0,
+            0.85
+          ]
         }
       ],
       "target_area": {

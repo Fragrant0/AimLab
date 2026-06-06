@@ -92,11 +92,8 @@ private:
 
     enum class DebugParameter
     {
-        Exposure = 0,
-        BloomIntensity,
-        BloomThreshold,
-        BloomRadius,
-        ShadowBias,
+        ShadowBias = 0,
+        PixelSize,
         Count
     };
 
@@ -104,6 +101,9 @@ private:
     Camera m_Camera;
 
     float m_DeltaTime;
+    float m_FpsTimer;
+    int m_FpsFrameCount;
+    int m_CurrentFps;
     float m_LastX;
     float m_LastY;
     bool m_FirstMouse;
@@ -140,7 +140,7 @@ private:
     bool m_WireframePressed;
     bool m_DebugOverlayVisible;
     bool m_PostEffectsEnabled;
-    bool m_BloomEnabled;
+    bool m_UnderwaterEnabled;
     bool m_IBLEnabled;
     bool m_PCSSEnabled;
     bool m_ShadowsEnabled;
@@ -149,16 +149,17 @@ private:
     bool m_DebugF3Pressed;
     bool m_DebugF4Pressed;
     bool m_DebugF5Pressed;
+    bool m_DebugF6Pressed;
+    bool m_DebugF7Pressed;
     bool m_DebugTabPressed;
+    bool m_FreeFlyMode;
+    bool m_PixelateEnabled;
     bool m_DebugDecreasePressed;
     bool m_DebugIncreasePressed;
     bool m_DebugResetPressed;
     DebugParameter m_DebugSelectedParameter;
-    float m_DebugExposureOffset;
-    float m_DebugBloomIntensityOffset;
-    float m_DebugBloomThresholdOffset;
-    float m_DebugBloomRadiusOffset;
     float m_DebugShadowBiasOffset;
+    float m_DebugPixelSizeOffset;
 
     float m_HitMarkerTimer;
     bool m_HitMarkerActive;

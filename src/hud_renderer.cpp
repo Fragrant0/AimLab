@@ -79,11 +79,8 @@ namespace
     {
         switch (index)
         {
-        case 0: return "曝光";
-        case 1: return "泛光强度";
-        case 2: return "泛光阈值";
-        case 3: return "泛光半径";
-        case 4: return "阴影偏移";
+        case 0: return "阴影偏移";
+        case 1: return "像素大小";
         default: return "--";
         }
     }
@@ -99,11 +96,8 @@ namespace
     {
         switch (index)
         {
-        case 0: return FormatFloat(post.Exposure);
-        case 1: return FormatFloat(post.Bloom.Intensity);
-        case 2: return FormatFloat(post.Bloom.Threshold);
-        case 3: return FormatFloat(post.Bloom.Radius);
-        case 4: return FormatFloat(shadowBias, 4);
+        case 0: return FormatFloat(shadowBias, 4);
+        case 1: return FormatFloat(post.PixelSize, 0);
         default: return "--";
         }
     }
@@ -134,13 +128,31 @@ void HudRenderer::Render(UIRenderer& uiRenderer,
                          const DebugOverlayState* debugOverlay)
 {
     const float uiScale = UIUtils::GetUIScale(screenWidth, screenHeight);
+    const bool freeFly = debugOverlay && debugOverlay->FreeFlyEnabled;
 
-    RenderCenterOverlay(uiRenderer, screenWidth, screenHeight, uiScale, hitMarkerActive, hitMarkerTimer);
-    RenderScoreboard(uiRenderer, fontRenderer, scoreSystem, screenWidth, screenHeight, uiScale);
-    RenderHintPanel(fontRenderer, mapName, screenWidth, screenHeight, uiScale);
+    if (!freeFly)
+    {
+        RenderCenterOverlay(uiRenderer, screenWidth, screenHeight, uiScale, hitMarkerActive, hitMarkerTimer);
+        RenderScoreboard(uiRenderer, fontRenderer, scoreSystem, screenWidth, screenHeight, uiScale);
+        RenderHintPanel(fontRenderer, mapName, screenWidth, screenHeight, uiScale);
 
-    if (hitFeedback)
-        hitFeedback->Render(fontRenderer);
+        if (hitFeedback)
+            hitFeedback->Render(fontRenderer);
+
+        // Draw a small FPS counter at bottom-right during normal gameplay
+        std::string fpsText = "FPS: " + std::to_string(debugOverlay ? debugOverlay->FPS : 0);
+        const float textScale = 0.45f * uiScale;
+        const float margin = UIUtils::ScaleToScreen(UILayout::HINT_MARGIN, uiScale);
+        const float textWidth = fontRenderer.GetTextWidth(textScale, fpsText);
+        fontRenderer.DrawText(static_cast<float>(screenWidth) - margin - textWidth, margin, textScale, fpsText, glm::vec3(0.18f, 0.96f, 0.78f));
+    }
+    else if (debugOverlay && !debugOverlay->Visible)
+    {
+        // Draw a subtle hint at the bottom left: "F6: 退出自由相机 (F1: 调试面板)"
+        const float textScale = 0.40f * uiScale;
+        const float margin = UIUtils::ScaleToScreen(UILayout::HINT_MARGIN, uiScale);
+        fontRenderer.DrawText(margin, margin, textScale, "F6: 退出自由相机 (F1: 调试面板)", glm::vec3(0.56f, 0.66f, 0.74f));
+    }
 
     if (debugOverlay && debugOverlay->Visible)
         RenderDebugOverlay(uiRenderer, fontRenderer, *debugOverlay, screenWidth, screenHeight, uiScale);
@@ -306,7 +318,8 @@ void HudRenderer::RenderHintPanel(FontRenderer& fontRenderer,
         {"MAP", mapName.c_str(), glm::vec3(0.96f, 0.97f, 0.99f), glm::vec3(1.0f, 0.82f, 0.24f)},
         {"WASD", "MOVE", glm::vec3(0.96f, 0.97f, 0.99f), glm::vec3(1.0f, 0.82f, 0.24f)},
         {"Space", "WIREFRAME", glm::vec3(0.96f, 0.97f, 0.99f), glm::vec3(0.72f, 0.84f, 1.0f)},
-        {"F1", "DEBUG", glm::vec3(0.96f, 0.97f, 0.99f), glm::vec3(0.72f, 0.84f, 1.0f)}
+        {"F1", "DEBUG", glm::vec3(0.96f, 0.97f, 0.99f), glm::vec3(0.72f, 0.84f, 1.0f)},
+        {"F6", "FREE-FLY", glm::vec3(0.96f, 0.97f, 0.99f), glm::vec3(0.72f, 0.84f, 1.0f)}
     };
 
     const float h = static_cast<float>(screenHeight);
@@ -378,15 +391,16 @@ void HudRenderer::RenderDebugOverlay(UIRenderer& uiRenderer,
     drawLine(std::string("调试  后效:") + OnOff(state.PostEffectsEnabled) +
              "  IBL:" + OnOff(state.IBLEnabled) +
              "  PCSS:" + OnOff(state.PCSSEnabled) +
-             "  泛光:" + OnOff(state.BloomEnabled), titleColor);
-    drawLine("F1面板  F2后效  F3 IBL  F4 PCSS  F5泛光", mutedColor);
+             "  水下:" + OnOff(state.UnderwaterEnabled) +
+             "  像素风:" + OnOff(state.PixelateEnabled) +
+             "  自由相机:" + OnOff(state.FreeFlyEnabled) +
+             "  FPS:" + std::to_string(state.FPS), titleColor);
+    drawLine("F1面板  F2后效  F3 IBL  F4 PCSS  F5水下  F6自由相机  F7像素风", mutedColor);
     drawLine("TAB选择  左右调整  Shift加速  R重置", mutedColor);
     drawLine(std::string("> ") + DebugParamName(state.SelectedParameter) +
              " " + DebugParamValue(state.SelectedParameter, post, state.ShadowBias), selectedColor);
-    drawLine("图像  曝光 " + FormatFloat(post.Exposure) +
-             "  泛光 " + FormatFloat(post.Bloom.Intensity) +
-             "  阈值 " + FormatFloat(post.Bloom.Threshold) +
-             "  半径 " + FormatFloat(post.Bloom.Radius), textColor);
+    drawLine("图像  像素大小 " + FormatFloat(post.PixelSize, 0) +
+             "  Gamma " + FormatFloat(post.Gamma), textColor);
     drawLine(std::string("阴影  偏移 ") + FormatFloat(state.ShadowBias, 4) +
              "  模式 " + (state.PCSSEnabled ? "PCSS" : "PCF") +
              "  线框:" + OnOff(state.WireframeEnabled), textColor);

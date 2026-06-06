@@ -213,23 +213,10 @@ void MapManager::LoadMapsFromJson(const std::string& path)
             if (jMap.contains("post_process"))
             {
                 const auto& jPost = jMap["post_process"];
-                map.PostProcess.Exposure = jPost.value("exposure", map.PostProcess.Exposure);
                 map.PostProcess.Gamma = jPost.value("gamma", map.PostProcess.Gamma);
-                map.PostProcess.Contrast = jPost.value("contrast", map.PostProcess.Contrast);
-                map.PostProcess.Saturation = jPost.value("saturation", map.PostProcess.Saturation);
-                map.PostProcess.Vignette = jPost.value("vignette", map.PostProcess.Vignette);
-                map.PostProcess.ChromaticAberration =
-                    jPost.value("chromatic_aberration", map.PostProcess.ChromaticAberration);
-                map.PostProcess.FilmGrain = jPost.value("film_grain", map.PostProcess.FilmGrain);
-
-                if (jPost.contains("bloom"))
-                {
-                    const auto& jBloom = jPost["bloom"];
-                    map.PostProcess.Bloom.Enabled = jBloom.value("enabled", map.PostProcess.Bloom.Enabled);
-                    map.PostProcess.Bloom.Threshold = jBloom.value("threshold", map.PostProcess.Bloom.Threshold);
-                    map.PostProcess.Bloom.Intensity = jBloom.value("intensity", map.PostProcess.Bloom.Intensity);
-                    map.PostProcess.Bloom.Radius = jBloom.value("radius", map.PostProcess.Bloom.Radius);
-                }
+                map.PostProcess.PixelateEnabled = jPost.value("pixelate_enabled", map.PostProcess.PixelateEnabled);
+                map.PostProcess.PixelSize = jPost.value("pixel_size", map.PostProcess.PixelSize);
+                map.PostProcess.UnderwaterEnabled = jPost.value("underwater_enabled", map.PostProcess.UnderwaterEnabled);
             }
 
             map.SpawnRadius = jMap.value("spawn_radius", 15.0f);
@@ -301,29 +288,65 @@ void MapManager::LoadMapsFromJson(const std::string& path)
 
 void MapManager::SetupDefaultMaps()
 {
-    MapConfig spaceMap;
-    spaceMap.Name = "Space";
-    spaceMap.Skybox.Type = SkyboxType::HDR;
-    spaceMap.Skybox.HDRPath = "resources/textures/skybox_hdr/rogland_clear_night_1k.hdr";
-    spaceMap.FloorTexturePath = "resources/textures/ground/space_aerial_rocks_02_diff_1k.jpg";
-    spaceMap.FloorTextureName = "floor_space";
-    spaceMap.AmbientColor = glm::vec3(0.1f, 0.1f, 0.2f);
-    spaceMap.AmbientIntensity = 0.24f;
-    SyncLegacyAmbient(spaceMap);
-    spaceMap.SpawnRadius = 24.0f;
-    spaceMap.Terrain = TerrainType::Heightmap;
-    spaceMap.Heightmap.Path = "resources/textures/heightmaps/rocky_peaks_height.png";
-    spaceMap.Heightmap.HeightScale = 18.0f;
-    spaceMap.Heightmap.GridSize = 256;
-    spaceMap.Heightmap.Size = 70.0f;
-    spaceMap.PlayerStartPos = glm::vec3(0.0f, 3.0f, 8.0f);
-    m_Maps.push_back(spaceMap);
+    MapConfig oceanMap;
+    oceanMap.Name = "Ocean";
+    oceanMap.Skybox.Type = SkyboxType::HDR;
+    oceanMap.Skybox.HDRPath = "resources/textures/skybox_hdr/underwater_hdr.hdr";
+    oceanMap.FloorTexturePath = "resources/textures/ground/sand.jpg";
+    oceanMap.FloorTextureName = "floor_ocean";
+    oceanMap.AmbientColor = glm::vec3(0.08f, 0.22f, 0.35f);
+    oceanMap.AmbientIntensity = 0.95f;
+    SyncLegacyAmbient(oceanMap);
+    oceanMap.SpawnRadius = 24.0f;
+    oceanMap.Terrain = TerrainType::Heightmap;
+    oceanMap.Heightmap.Path = "resources/textures/heightmaps/seabed_heightmap.png";
+    oceanMap.Heightmap.HeightScale = 4.0f;
+    oceanMap.Heightmap.GridSize = 256;
+    oceanMap.Heightmap.Size = 60.0f;
+    oceanMap.PlayerStartPos = glm::vec3(0.0f, 1.5f, 8.0f);
+    oceanMap.PostProcess.UnderwaterEnabled = true;
+    oceanMap.EcologyEnabled = true;
+
+    // Add default fish props
+    PropConfig fish1;
+    fish1.ModelPath = "resources/objects/fish/BarramundiFish.gltf";
+    fish1.Position = glm::vec3(6.0f, 2.2f, -12.0f);
+    fish1.Rotation = glm::vec3(0.0f, 45.0f, 0.0f);
+    fish1.Scale = glm::vec3(1.5f);
+    fish1.TargetHeight = 2.2f;
+    fish1.PBRBrightness = 1.15f;
+    fish1.PBRAmbientIntensity = 0.6f;
+    fish1.PBRAmbientColor = glm::vec3(0.45f, 0.85f, 0.95f);
+    oceanMap.Props.push_back(fish1);
+
+    PropConfig fish2 = fish1;
+    fish2.Position = glm::vec3(-8.0f, 3.0f, -20.0f);
+    fish2.Rotation = glm::vec3(0.0f, -30.0f, 0.0f);
+    fish2.Scale = glm::vec3(1.8f);
+    fish2.TargetHeight = 3.0f;
+    oceanMap.Props.push_back(fish2);
+
+    PropConfig fish3 = fish1;
+    fish3.Position = glm::vec3(3.0f, 4.5f, -30.0f);
+    fish3.Rotation = glm::vec3(0.0f, 90.0f, 0.0f);
+    fish3.Scale = glm::vec3(2.0f);
+    fish3.TargetHeight = 4.5f;
+    oceanMap.Props.push_back(fish3);
+
+    PropConfig fish4 = fish1;
+    fish4.Position = glm::vec3(-12.0f, 1.5f, -8.0f);
+    fish4.Rotation = glm::vec3(0.0f, 120.0f, 0.0f);
+    fish4.Scale = glm::vec3(1.3f);
+    fish4.TargetHeight = 1.5f;
+    oceanMap.Props.push_back(fish4);
+
+    m_Maps.push_back(oceanMap);
 
     MapConfig natureMap;
     natureMap.Name = "Nature";
     natureMap.Skybox.Type = SkyboxType::HDR;
     natureMap.Skybox.HDRPath = "resources/textures/skybox_hdr/citrus_orchard_road_puresky_1k.hdr";
-    natureMap.FloorTexturePath = "resources/textures/terrain/nature_rocky_peaks_diffuse.png";
+    natureMap.FloorTexturePath = "resources/textures/ground/nature_rocky_peaks_diffuse.png";
     natureMap.FloorTextureName = "floor_nature";
     natureMap.AmbientColor = glm::vec3(0.2f, 0.3f, 0.2f);
     natureMap.AmbientIntensity = 1.0f;
@@ -337,21 +360,62 @@ void MapManager::SetupDefaultMaps()
     natureMap.PlayerStartPos = glm::vec3(0.0f, 3.0f, 5.0f);
     m_Maps.push_back(natureMap);
 
-    MapConfig cityMap;
-    cityMap.Name = "City";
-    cityMap.Skybox.Type = SkyboxType::HDR;
-    cityMap.Skybox.HDRPath = "resources/textures/skybox_hdr/urban_street_04_1k.hdr";
-    cityMap.FloorTexturePath = "resources/textures/ground/city_asphalt_02_diff_1k.jpg";
-    cityMap.FloorTextureName = "floor_city";
-    cityMap.AmbientColor = glm::vec3(0.3f, 0.3f, 0.3f);
-    cityMap.AmbientIntensity = 0.22f;
-    SyncLegacyAmbient(cityMap);
-    cityMap.SpawnRadius = 18.0f;
-    cityMap.Terrain = TerrainType::Heightmap;
-    cityMap.Heightmap.Path = "resources/textures/heightmaps/rocky_peaks_height.png";
-    cityMap.Heightmap.HeightScale = 3.0f;
-    cityMap.Heightmap.GridSize = 256;
-    cityMap.Heightmap.Size = 48.0f;
-    cityMap.PlayerStartPos = glm::vec3(0.0f, 3.0f, 6.0f);
-    m_Maps.push_back(cityMap);
+    MapConfig craterMap;
+    craterMap.Name = "Crater Base";
+    craterMap.Skybox.Type = SkyboxType::HDR;
+    craterMap.Skybox.HDRPath = "resources/textures/skybox_hdr/qwantani_night_puresky_1k.hdr";
+    craterMap.FloorTexturePath = "resources/textures/ground/brown_mud_02_diff_1k.png";
+    craterMap.FloorTextureName = "floor_mud";
+    craterMap.AmbientColor = glm::vec3(0.12f, 0.15f, 0.25f);
+    craterMap.AmbientIntensity = 0.55f;
+    SyncLegacyAmbient(craterMap);
+    craterMap.Lighting.MainLight.Direction = glm::normalize(glm::vec3(-0.3f, -0.9f, -0.3f));
+    craterMap.Lighting.MainLight.Color = glm::vec3(0.75f, 0.85f, 1.0f);
+    craterMap.Lighting.MainLight.Intensity = 1.4f;
+    craterMap.Lighting.MainLight.SyncWithSkyboxRotation = false;
+    craterMap.Lighting.MainLight.AngularSize = 0.15f;
+    craterMap.Lighting.IBLDiffuseIntensity = 0.45f;
+    craterMap.Lighting.IBLSpecularIntensity = 0.6f;
+    craterMap.SpawnRadius = 18.0f;
+    craterMap.Terrain = TerrainType::Heightmap;
+    craterMap.Heightmap.Path = "resources/textures/heightmaps/crater_heightmap.png";
+    craterMap.Heightmap.HeightScale = 14.0f;
+    craterMap.Heightmap.GridSize = 256;
+    craterMap.Heightmap.Size = 65.0f;
+    craterMap.PlayerStartPos = glm::vec3(0.0f, 5.0f, 10.0f);
+    craterMap.PostProcess.UnderwaterEnabled = false;
+    craterMap.EcologyEnabled = true;
+
+    // Add default UFO prop
+    PropConfig ufo;
+    ufo.ModelPath = "resources/objects/ufo_flying_saucer_spaceship_ovni/scene.gltf";
+    ufo.Position = glm::vec3(0.0f, 5.0f, -12.0f);
+    ufo.Rotation = glm::vec3(0.0f, 0.0f, 0.0f);
+    ufo.Scale = glm::vec3(0.15f);
+    ufo.TargetHeight = 5.0f;
+    ufo.PBRBrightness = 1.2f;
+    ufo.PBRAmbientIntensity = 0.4f;
+    ufo.PBRAmbientColor = glm::vec3(1.0f, 0.45f, 0.0f);
+    craterMap.Props.push_back(ufo);
+
+    // Add default spaceship props
+    PropConfig ship1;
+    ship1.ModelPath = "resources/objects/light_fighter_spaceship_-_free_-/scene.gltf";
+    ship1.Position = glm::vec3(4.8f, 1.2f, -8.0f);
+    ship1.Rotation = glm::vec3(0.0f, 45.0f, 0.0f);
+    ship1.Scale = glm::vec3(1.0f);
+    ship1.TargetHeight = 1.5f;
+    ship1.PBRBrightness = 1.2f;
+    ship1.PBRAmbientIntensity = 0.4f;
+    ship1.PBRAmbientColor = glm::vec3(0.0f, 0.85f, 1.0f);
+    craterMap.Props.push_back(ship1);
+
+    PropConfig ship2 = ship1;
+    ship2.Position = glm::vec3(-4.8f, 1.5f, -10.0f);
+    ship2.Rotation = glm::vec3(0.0f, -45.0f, 0.0f);
+    ship2.TargetHeight = 1.8f;
+    ship2.PBRAmbientColor = glm::vec3(1.0f, 0.0f, 0.85f);
+    craterMap.Props.push_back(ship2);
+
+    m_Maps.push_back(craterMap);
 }

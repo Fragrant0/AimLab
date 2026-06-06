@@ -19,6 +19,10 @@ public:
     float GetRadius() const { return m_Radius; }
     unsigned int GetSectorCount() const { return m_SectorCount; }
     unsigned int GetStackCount() const { return m_StackCount; }
+    unsigned int GetVAO() const { return m_VAO; }
+    unsigned int GetVBO() const { return m_VBO; }
+    unsigned int GetEBO() const { return m_EBO; }
+    const std::vector<unsigned int>& GetIndices() const { return m_Indices; }
 
 private:
     void GenerateMesh();

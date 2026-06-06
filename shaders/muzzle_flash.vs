@@ -15,6 +15,6 @@ void main()
     vec4 worldPos = model * vec4(aPos, 1.0);
     gl_Position = projection * view * worldPos;
 
-    TexCoord = aPos.xy / 0.08f + 0.5f;
+    TexCoord = aPos.xy / 0.16f + 0.5f;
     LifeRatio = lifeRatio;
 }

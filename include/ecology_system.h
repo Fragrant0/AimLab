@@ -19,7 +19,7 @@ public:
     EcologySystem();
     ~EcologySystem();
 
-    void Generate(const Terrain* terrain);
+    void Generate(const Terrain* terrain, const std::string& mapName);
     void Update(float deltaTime, const Terrain* terrain);
     void Render(const Camera& camera, Shader& shader, const glm::mat4& projection, const glm::mat4& view, const glm::vec3& ambientLight);
     void RenderDepth(Shader& shader) const;
@@ -76,6 +76,12 @@ private:
         AnimalState State;
     };
 
+    struct SphereInstance
+    {
+        glm::mat4 model;
+        glm::vec3 color;
+    };
+
     void Clear();
     void GenerateVegetation(const Terrain* terrain);
     void GenerateBirds(const Terrain* terrain);
@@ -86,17 +92,34 @@ private:
     glm::vec3 RandomPointOnTerrain(const Terrain* terrain, float border) const;
     float RandomRange(float minValue, float maxValue);
 
+    void CollectVegetationInstances();
+    void SetupInstancingBuffers();
+    void UpdateDynamicInstances();
+    void AddSphereInstance(std::vector<SphereInstance>& list, const glm::vec3& position, const glm::vec3& scale, const glm::vec3& color, float yawDegrees = 0.0f) const;
+    void SetupVAO(unsigned int& vao, unsigned int& vbo, const std::vector<SphereInstance>& instances, bool isStatic);
+
     void RenderVegetation(Shader& shader) const;
     void RenderBirds(Shader& shader) const;
     void RenderGroundAnimals(Shader& shader) const;
-    void RenderSpherePart(Shader& shader, const glm::vec3& position, const glm::vec3& scale, const glm::vec3& color, float yawDegrees = 0.0f) const;
 
     std::vector<VegetationInstance> m_Vegetation;
     std::vector<BirdAgent> m_Birds;
     std::vector<GroundAnimal> m_GroundAnimals;
 
+    std::vector<SphereInstance> m_VegInstances;
+    std::vector<SphereInstance> m_BirdInstances;
+    std::vector<SphereInstance> m_AnimalInstances;
+
+    unsigned int m_VegVAO;
+    unsigned int m_VegVBO;
+    unsigned int m_BirdVAO;
+    unsigned int m_BirdVBO;
+    unsigned int m_AnimalVAO;
+    unsigned int m_AnimalVBO;
+
     std::unique_ptr<SphereMesh> m_SphereMesh;
     std::mt19937 m_RandomEngine;
+    std::string m_MapName;
 };
 
 #endif

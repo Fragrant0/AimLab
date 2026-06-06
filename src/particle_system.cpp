@@ -136,9 +136,9 @@ void ParticleSystem::EmitExplosion(const glm::vec3& position, const glm::vec3& c
 {
     std::uniform_real_distribution<float> speedDist(minSpeed, maxSpeed);
     std::uniform_real_distribution<float> dirDist(-1.0f, 1.0f);
-    std::uniform_real_distribution<float> lifeDist(0.4f, 1.2f);
-    std::uniform_real_distribution<float> sizeDist(0.25f, 0.4f);
-    std::uniform_real_distribution<float> offsetDist(-0.15f, 0.15f);
+    std::uniform_real_distribution<float> lifeDist(0.3f, 0.7f);
+    std::uniform_real_distribution<float> sizeDist(0.08f, 0.18f);
+    std::uniform_real_distribution<float> offsetDist(-0.10f, 0.10f);
 
     const float invCount = 1.0f / static_cast<float>(count);
 

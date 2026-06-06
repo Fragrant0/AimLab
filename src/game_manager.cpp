@@ -10,6 +10,9 @@ GameManager::GameManager()
     : m_Window(nullptr),
       m_Camera(glm::vec3(0.0f, 0.0f, 3.0f)),
       m_DeltaTime(0.0f),
+      m_FpsTimer(0.0f),
+      m_FpsFrameCount(0),
+      m_CurrentFps(0),
       m_LastX(SCR_WIDTH / 2.0f),
       m_LastY(SCR_HEIGHT / 2.0f),
       m_FirstMouse(true),
@@ -19,7 +22,7 @@ GameManager::GameManager()
       m_WireframePressed(false),
       m_DebugOverlayVisible(false),
       m_PostEffectsEnabled(true),
-      m_BloomEnabled(true),
+      m_UnderwaterEnabled(false),
       m_IBLEnabled(true),
       m_PCSSEnabled(true),
       m_ShadowsEnabled(true),
@@ -28,16 +31,17 @@ GameManager::GameManager()
       m_DebugF3Pressed(false),
       m_DebugF4Pressed(false),
       m_DebugF5Pressed(false),
+      m_DebugF6Pressed(false),
+      m_DebugF7Pressed(false),
       m_DebugTabPressed(false),
+      m_FreeFlyMode(false),
+      m_PixelateEnabled(false),
       m_DebugDecreasePressed(false),
       m_DebugIncreasePressed(false),
       m_DebugResetPressed(false),
-      m_DebugSelectedParameter(DebugParameter::Exposure),
-      m_DebugExposureOffset(0.0f),
-      m_DebugBloomIntensityOffset(0.0f),
-      m_DebugBloomThresholdOffset(0.0f),
-      m_DebugBloomRadiusOffset(0.0f),
+      m_DebugSelectedParameter(DebugParameter::ShadowBias),
       m_DebugShadowBiasOffset(0.0f),
+      m_DebugPixelSizeOffset(0.0f),
       m_HitMarkerTimer(0.0f),
       m_HitMarkerActive(false),
       m_ScreenWidth(SCR_WIDTH),
@@ -81,6 +85,7 @@ bool GameManager::Initialize(GLFWwindow* window)
         m_TargetManager->Initialize();
 
         const MapConfig& currentMap = m_MapManager->GetCurrentMap();
+        m_UnderwaterEnabled = currentMap.PostProcess.UnderwaterEnabled;
         m_TargetManager->SetTargetWall(
             currentMap.TargetArea.WallDistance,
             currentMap.TargetArea.WallWidth,
@@ -133,6 +138,8 @@ void GameManager::LoadResources()
     rm.LoadShader("terrain", "shaders/terrain.vs", "shaders/terrain.fs");
     rm.LoadShader("skybox", "shaders/skybox.vs", "shaders/skybox.fs");
     rm.LoadShader("sphere", "shaders/sphere.vs", "shaders/sphere.fs");
+    rm.LoadShader("ecology_sphere", "shaders/ecology_sphere.vs", "shaders/ecology_sphere.fs");
+    rm.LoadShader("ecology_shadow_depth", "shaders/ecology_shadow_depth.vs", "shaders/shadow_depth.fs");
     rm.LoadShader("particle", "shaders/particle.vs", "shaders/particle.fs");
     rm.LoadShader("weapon", "shaders/weapon.vs", "shaders/weapon.fs");
     rm.LoadShader("muzzle_flash", "shaders/muzzle_flash.vs", "shaders/muzzle_flash.fs");
@@ -232,7 +239,7 @@ void GameManager::SetupEcology()
     const MapConfig& currentMap = m_MapManager->GetCurrentMap();
     if (currentMap.EcologyEnabled && currentMap.Terrain == TerrainType::Heightmap && m_Terrain && m_Terrain->IsInitialized())
     {
-        m_EcologySystem->Generate(m_Terrain.get());
+        m_EcologySystem->Generate(m_Terrain.get(), currentMap.Name);
     }
 }
 
@@ -240,6 +247,12 @@ void GameManager::ProcessInput(GLFWwindow* window)
 {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
+
+    float currentSpeed = m_Camera.MovementSpeed;
+    if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS)
+    {
+        m_Camera.MovementSpeed *= 3.0f;
+    }
 
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
         m_Camera.ProcessKeyboard(FORWARD, m_DeltaTime);
@@ -249,6 +262,16 @@ void GameManager::ProcessInput(GLFWwindow* window)
         m_Camera.ProcessKeyboard(LEFT, m_DeltaTime);
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
         m_Camera.ProcessKeyboard(RIGHT, m_DeltaTime);
+
+    if (m_FreeFlyMode)
+    {
+        if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
+            m_Camera.ProcessKeyboard(UP, m_DeltaTime);
+        if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
+            m_Camera.ProcessKeyboard(DOWN, m_DeltaTime);
+    }
+
+    m_Camera.MovementSpeed = currentSpeed;
 
     if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
     {
@@ -337,7 +360,13 @@ void GameManager::HandleDebugInput(GLFWwindow* window)
         m_PCSSEnabled = !m_PCSSEnabled;
 
     if (consumePress(glfwGetKey(window, GLFW_KEY_F5) == GLFW_PRESS, m_DebugF5Pressed))
-        m_BloomEnabled = !m_BloomEnabled;
+        m_UnderwaterEnabled = !m_UnderwaterEnabled;
+
+    if (consumePress(glfwGetKey(window, GLFW_KEY_F6) == GLFW_PRESS, m_DebugF6Pressed))
+        m_FreeFlyMode = !m_FreeFlyMode;
+
+    if (consumePress(glfwGetKey(window, GLFW_KEY_F7) == GLFW_PRESS, m_DebugF7Pressed))
+        m_PixelateEnabled = !m_PixelateEnabled;
 
     if (consumePress(glfwGetKey(window, GLFW_KEY_TAB) == GLFW_PRESS, m_DebugTabPressed))
     {
@@ -377,20 +406,11 @@ void GameManager::AdjustDebugParameter(float direction)
 
     switch (m_DebugSelectedParameter)
     {
-    case DebugParameter::Exposure:
-        adjustOffset(base.Exposure, m_DebugExposureOffset, 0.05f, 0.05f, 4.0f);
-        break;
-    case DebugParameter::BloomIntensity:
-        adjustOffset(base.Bloom.Intensity, m_DebugBloomIntensityOffset, 0.05f, 0.0f, 2.0f);
-        break;
-    case DebugParameter::BloomThreshold:
-        adjustOffset(base.Bloom.Threshold, m_DebugBloomThresholdOffset, 0.05f, 0.0f, 5.0f);
-        break;
-    case DebugParameter::BloomRadius:
-        adjustOffset(base.Bloom.Radius, m_DebugBloomRadiusOffset, 0.05f, 0.0f, 1.0f);
-        break;
     case DebugParameter::ShadowBias:
         adjustOffset(RenderSettings::kDefaultShadowBias, m_DebugShadowBiasOffset, 0.0002f, 0.0001f, 0.02f);
+        break;
+    case DebugParameter::PixelSize:
+        adjustOffset(base.PixelSize, m_DebugPixelSizeOffset, 1.0f, 1.0f, 32.0f);
         break;
     case DebugParameter::Count:
         break;
@@ -400,37 +420,30 @@ void GameManager::AdjustDebugParameter(float direction)
 void GameManager::ResetDebugAdjustments()
 {
     m_PostEffectsEnabled = true;
-    m_BloomEnabled = true;
+    m_UnderwaterEnabled = m_MapManager ? m_MapManager->GetCurrentMap().PostProcess.UnderwaterEnabled : false;
     m_IBLEnabled = true;
     m_PCSSEnabled = true;
     m_ShadowsEnabled = true;
-    m_DebugExposureOffset = 0.0f;
-    m_DebugBloomIntensityOffset = 0.0f;
-    m_DebugBloomThresholdOffset = 0.0f;
-    m_DebugBloomRadiusOffset = 0.0f;
+    m_FreeFlyMode = false;
+    m_PixelateEnabled = false;
     m_DebugShadowBiasOffset = 0.0f;
+    m_DebugPixelSizeOffset = 0.0f;
 }
 
 PostProcessConfig GameManager::GetEffectivePostProcessConfig() const
 {
     PostProcessConfig config = m_MapManager ? m_MapManager->GetCurrentPostProcess() : PostProcessConfig();
 
-    config.Exposure = std::clamp(config.Exposure + m_DebugExposureOffset, 0.05f, 4.0f);
-    config.Bloom.Intensity = std::clamp(config.Bloom.Intensity + m_DebugBloomIntensityOffset, 0.0f, 2.0f);
-    config.Bloom.Threshold = std::clamp(config.Bloom.Threshold + m_DebugBloomThresholdOffset, 0.0f, 5.0f);
-    config.Bloom.Radius = std::clamp(config.Bloom.Radius + m_DebugBloomRadiusOffset, 0.0f, 1.0f);
+    config.PixelSize = std::clamp(config.PixelSize + m_DebugPixelSizeOffset, 1.0f, 32.0f);
     if (!m_PostEffectsEnabled)
     {
-        config.Contrast = 1.0f;
-        config.Saturation = 1.0f;
-        config.Vignette = 0.0f;
-        config.ChromaticAberration = 0.0f;
-        config.FilmGrain = 0.0f;
-        config.Bloom.Enabled = false;
+        config.PixelateEnabled = false;
+        config.UnderwaterEnabled = false;
     }
     else
     {
-        config.Bloom.Enabled = config.Bloom.Enabled && m_BloomEnabled;
+        config.PixelateEnabled = m_PixelateEnabled;
+        config.UnderwaterEnabled = m_UnderwaterEnabled;
     }
 
     return config;
@@ -447,10 +460,13 @@ DebugOverlayState GameManager::BuildDebugOverlayState(const glm::vec3& mainLight
     state.Visible = m_DebugOverlayVisible;
     state.PostEffectsEnabled = m_PostEffectsEnabled;
     state.PostProcess = GetEffectivePostProcessConfig();
-    state.BloomEnabled = m_PostEffectsEnabled && m_BloomEnabled && state.PostProcess.Bloom.Enabled;
     state.IBLEnabled = m_IBLEnabled;
     state.PCSSEnabled = m_PCSSEnabled;
+    state.PixelateEnabled = m_PostEffectsEnabled && m_PixelateEnabled;
+    state.UnderwaterEnabled = m_PostEffectsEnabled && m_UnderwaterEnabled;
     state.WireframeEnabled = m_WireframeMode;
+    state.FreeFlyEnabled = m_FreeFlyMode;
+    state.FPS = m_CurrentFps;
     state.SelectedParameter = static_cast<int>(m_DebugSelectedParameter);
     state.MainLightDirection = mainLightDirection;
     state.SkyboxRotationDegrees = glm::degrees(m_SkyboxRotation);
@@ -471,12 +487,21 @@ void GameManager::Update(float deltaTime)
 {
     m_DeltaTime = deltaTime;
 
+    m_FpsTimer += deltaTime;
+    m_FpsFrameCount++;
+    if (m_FpsTimer >= 0.5f)
+    {
+        m_CurrentFps = static_cast<int>(std::round(m_FpsFrameCount / m_FpsTimer));
+        m_FpsTimer = 0.0f;
+        m_FpsFrameCount = 0;
+    }
+
     ClampPlayerToTerrain();
 
     if (m_EcologySystem)
         m_EcologySystem->Update(deltaTime, m_Terrain.get());
 
-    if (m_TargetManager)
+    if (m_TargetManager && !m_FreeFlyMode)
         m_TargetManager->Update(deltaTime, m_Camera, m_Terrain.get());
 
     if (m_ScoreSystem)
@@ -626,7 +651,7 @@ void GameManager::RenderScene(const glm::vec3& mainLightDirection, ShadowMapper*
         if (m_EcologySystem && m_EcologySystem->IsReady())
         {
             ResourceManager& rm = ResourceManager::GetInstance();
-            Shader* ecologyShader = rm.GetShader("sphere");
+            Shader* ecologyShader = rm.GetShader("ecology_sphere");
             if (ecologyShader)
             {
                 m_EcologySystem->Render(m_Camera, *ecologyShader, projection, view, m_MapManager->GetCurrentAmbientLight());
@@ -645,16 +670,22 @@ void GameManager::RenderScene(const glm::vec3& mainLightDirection, ShadowMapper*
                                  m_PCSSEnabled,
                                  shadowBias);
 
-        m_TargetRenderer.Render(m_TargetManager.get(),
-                                m_Camera,
-                                m_MapManager->GetCurrentAmbientLight(),
-                                projection,
-                                view);
+        if (!m_FreeFlyMode)
+        {
+            m_TargetRenderer.Render(m_TargetManager.get(),
+                                    m_Camera,
+                                    m_MapManager->GetCurrentAmbientLight(),
+                                    projection,
+                                    view);
+        }
     }
 
     m_SkyboxRenderer.Render(currentMap, projection, m_Camera.GetViewMatrix(), m_SkyboxRotation);
     m_ParticleRenderer.Render(m_ParticleSystem.get(), projection, view);
-    m_WeaponViewRenderer.Render(m_Weapon.get(), m_Camera, m_ScreenWidth, m_ScreenHeight);
+    if (!m_FreeFlyMode)
+    {
+        m_WeaponViewRenderer.Render(m_Weapon.get(), m_Camera, m_ScreenWidth, m_ScreenHeight);
+    }
 }
 
 void GameManager::Cleanup()
@@ -720,7 +751,7 @@ void GameManager::Shoot()
         HitResult result = m_ScoreSystem->OnHit(hitDistance, precision);
 
         if (m_ParticleSystem)
-            m_ParticleSystem->EmitExplosion(hitPos, glm::vec3(1.0f, 0.8f, 0.2f), 12, 1.0f, 3.0f);
+            m_ParticleSystem->EmitExplosion(hitPos, glm::vec3(1.0f, 0.75f, 0.15f), 22, 1.5f, 4.5f);
 
         if (m_ScreenShake)
         {
@@ -817,6 +848,7 @@ void GameManager::SwitchMap(int mapIndex)
     m_MapManager->SwitchToMap(mapIndex);
 
     const MapConfig& newMap = m_MapManager->GetCurrentMap();
+    m_UnderwaterEnabled = newMap.PostProcess.UnderwaterEnabled;
 
     LoadMapResources();
     SetupTerrain();
@@ -855,6 +887,9 @@ void GameManager::SwitchMap(int mapIndex)
 
 void GameManager::ClampPlayerToTerrain()
 {
+    if (m_FreeFlyMode)
+        return;
+
     if (!m_Terrain || !m_Terrain->IsInitialized())
     {
         if (m_Camera.Position.y < 1.0f)
