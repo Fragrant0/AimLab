@@ -1,273 +1,201 @@
-# OpenGL FPS Aim Lab Demo 作品集说明
+# OpenGL 实时渲染与 FPS 交互作品集展示
 
-## 项目一句话
+> 本文档是一个预留了视频和截图占位符的作品集模板。您可以直接将此文档作为您个人网站、GitHub 首页或求职演示的 Markdown 框架。
 
-这是一个基于 C++17 / OpenGL 3.3 的实时渲染与 FPS 交互 Demo。项目围绕技术美术和游戏客户端两个方向展开：一方面展示 PBR/IBL、HDR 环境光、PCSS 软阴影、后处理和地图光照配置；另一方面展示资源管理、渲染模块拆分、输入/射击/HUD/粒子反馈等客户端工程能力。
+---
 
-## 可展示产出
+## 🎥 项目演示视频
 
-### 1. 三套可切换场景
+<!-- PLACEHOLDER: 推荐放置 60-90 秒的 Bilibili 嵌入链接、YouTube 嵌入链接，或者本地 mp4 视频地址 -->
+<!-- 
+示例格式：
+<video src="images/portfolio_demo.mp4" width="100%" controls poster="images/01_ocean_overview.png"></video> 
+-->
 
-项目通过 `resources/maps_config.json` 驱动三张地图：
+> 💡 **视频录制脚本建议：**
+> 1. **Ocean 场景开场 (0-20s)**：演示水下扭曲波动、红光吸收后处理、动态和静态鱼类 PBR 模型，展示水下环境光。
+> 2. **Nature 场景过渡 (20-40s)**：展示夕阳暖色 HDR 天空盒、高低起伏的山地地形，以及生态树木布置。
+> 3. **Crater Base 场景高潮 (40-60s)**：展示星空穹顶、陨石坑地形、停泊的飞船与悬浮的 UFO 模型。打开 Debug Overlay 调整点光源强度，体现强对比的科幻霓虹氛围。
+> 4. **FPS 射击闭环 (60-80s)**：进行靶球射击，展示后坐力、枪口火光、命中粒子、连击数 (Combo) 提示、Hit Marker 以及屏幕震动反馈。
+> 5. **调试面板与线框模式 (80-90s)**：按 `F1` 开启调试面板，现场演示关闭 IBL、切换 PCSS/PCF 阴影、调节曝光，并按 `SPACE` 切换线框模式展示地形网格。
 
-| 地图 | 展示重点 | 运行时内容 |
-| --- | --- | --- |
-| Space | 冷色 HDR、岩石地形、科幻模型 | SciFi Helmet、蓝橙点光、偏冷 IBL |
-| Nature | 自然 HDR、高度图地形、生态对象 | Avocado PBR 模型、程序化树木、自然暖光 |
-| City | 城市场景、点光源、PBR 展示模型 | BoomBox、冷暖点光、克制 bloom |
+---
 
-每张地图都可以独立配置 HDR、地面纹理、高度图、主光方向、点光源、后处理参数、PBR 展示模型和目标区域。展示时可以用 `1/2/3` 切换地图，说明这是数据驱动的场景系统，而不是写死的单场景 Demo。
+## 📌 项目一句话定位
 
-### 2. PBR + IBL 模型展示
+这是一个基于 **C++17** 和 **OpenGL 3.3 Core Profile** 的模块化实时渲染与第一人称射击 (FPS) 交互框架。项目围绕 **技术美术 (TA)** 与 **游戏客户端开发** 两大方向设计，打通了从 HDR 预计算、PBR/IBL 材质、PCSS 软阴影、多风格后处理到射击反馈闭环的完整链路。
 
-项目支持外部下载的 glTF/FBX/OBJ PBR 模型接入。模型加载模块会处理 mesh、材质贴图、切线空间和包围盒，PBR shader 支持：
+---
 
-- Albedo / Normal / Metallic / Roughness / AO / ARM / Emissive
-- Cook-Torrance BRDF
-- GGX 法线分布
-- Fresnel-Schlick
-- HDR skybox 生成的 irradiance map、prefilter map 和 BRDF LUT
-- 按地图变化的 IBL 漫反射和镜面环境光
+## 🎨 场景渲染与美术风格展示
 
-展示价值：能说明模型不是单纯贴图显示，而是接入了较完整的实时 PBR 光照流程。
+项目通过数据驱动的地图配置文件 `resources/maps_config.json` 驱动三张完全不同主题、光照与渲染管线设置的场景：
 
-### 3. 阴影系统与 PCSS 软阴影
+### 1. Ocean (深海海底场景)
+* **设计重点**：水下风格化后处理、海底沙丘地形、水下漫反射/环境色吸收。
+* **运行时内容**：水下扭曲波动、深海红光衰减、绿蓝点光源、 instanced 海草与珊瑚生态、动态游动的鱼类 PBR 模型。
 
-阴影系统由 `ShadowMapper` 和 `ShadowPassRenderer` 管理，当前产出包括：
+<!-- PLACEHOLDER: 海底场景整体效果截图 -->
+![Ocean Map Overview](images/01_ocean_overview.png)
+*(占位符：请将海底场景全景截图命名为 `01_ocean_overview.png` 并存放在 `docs/images/` 目录下)*
 
-- 4096 分辨率 shadow map
-- 32-bit float depth texture
-- camera-centered light frustum
-- texel snapping 减少阴影游动
-- PCF / PCSS 运行时切换
-- shadow bias 运行时调节
-- 天空盒旋转时同步主光方向，避免天空光照和阴影方向脱节
+---
 
-展示价值：不仅有阴影，而且考虑了稳定性、软边、调参和天空盒联动这些技术美术常见痛点。
+### 2. Nature (落日峡谷场景)
+* **设计重点**：暖色夕阳 HDR 环境光照、高耸的陡峭峡谷地形。
+* **运行时内容**：落日 HDR 天空盒、IBL 环境光贴图、BoomBox 录音机 PBR 模型、程序化树木/植被生态。
 
-### 4. 后处理与风格控制
+<!-- PLACEHOLDER: 峡谷场景整体效果截图 -->
+![Nature Map Overview](images/02_nature_overview.png)
+*(占位符：请将自然场景全景截图命名为 `02_nature_overview.png` 并存放在 `docs/images/` 目录下)*
 
-后处理管线使用 HDR scene color FBO，当前包括：
+---
 
-- Exposure
-- ACES tone mapping
-- Gamma
-- Contrast / Saturation
-- Vignette
-- Chromatic aberration
-- Film grain
-- Bright-pass bloom
-- 全分辨率 bloom blur
+### 3. Crater Base (科幻陨石坑基地)
+* **设计重点**：高反差霓虹点光源、大体量科幻模型、高对比度阴影。
+* **运行时内容**：纯净夜空 HDR 天空盒、陨石坑地形、低光照强反差月光、霓虹地带（蓝、品红、橙色点光源）、停泊的战机与悬浮的 UFO 模型。
 
-不同地图的后处理参数在 `maps_config.json` 中配置。运行时 debug overlay 可以开关后处理和 bloom，并调节曝光、bloom 强度、阈值和半径。
+<!-- PLACEHOLDER: 科幻基地场景整体效果截图 -->
+![Crater Base Map Overview](images/03_crater_base_overview.png)
+*(占位符：请将基地场景全景截图命名为 `03_crater_base_overview.png` 并存放在 `docs/images/` 目录下)*
 
-### 5. FPS 交互闭环
+---
 
-项目不是纯渲染窗口，而是有完整的第一人称交互：
+## 🛠️ 核心技术模块与亮点
 
-- WASD 移动和鼠标视角
-- 武器模型和后坐力
-- 枪口火光
-- 射线命中检测
-- 靶球生命周期管理
-- 分数、combo、hit marker
-- 命中粒子和屏幕震动
-- HUD 与调试面板
+### 1. 物理光照 (PBR) 与基于图像的光照 (IBL)
+系统实现了完整的 **Cook-Torrance BRDF** 光照模型，支持常见的 PBR 贴图通道：Albedo, Normal, Metallic, Roughness, AO/ARM, Emissive。
+* **IBL 预计算**：在运行时加载 HDR 全景图并转换为 Cubemap，利用 GPU 预计算并渲染出 **Irradiance Map (漫反射环境光)**、**Prefilter Map (镜面反射环境光)** 和 **BRDF Integration LUT (查找表)**。
+* **视觉呈现**：PBR 展示模型在不同场景（如深海的冷 teal 色与峡谷的暖橙色）下能呈现高度吻合的反射光泽与环境反射。
 
-展示价值：适合游戏客户端方向，能说明渲染系统与玩法反馈已经形成闭环。
+<!-- PLACEHOLDER: PBR模型开启/关闭IBL对比图 -->
+![PBR IBL Comparison](images/04_pbr_ibl_on_off.png)
+*(占位符：请将模型在 IBL 开启与关闭下的对比图命名为 `04_pbr_ibl_on_off.png` 存放在 `docs/images/` 目录下)*
 
-### 6. Debug Overlay
+---
 
-按 `F1` 打开中文调试面板，可展示运行时调参能力：
+### 2. 阴影系统与 PCSS (百分比渐进软阴影)
+阴影通道由 `ShadowMapper` 和 `ShadowPassRenderer` 驱动，支持 4096 分辨率的深度图渲染：
+* **动态软化**：实现 **PCSS (Percentage-Closer Soft Shadows)**。通过搜索遮挡物计算遮挡深度，动态确定 PCF 过滤半径，完美实现“近处阴影硬、远处阴影软”的真实半影效果。
+* **阴影抗抖动**：支持 **Texel Snapping** 算法，避免相机移动时阴影边缘出现像素游动。
+* **光源联动**：光源方向与天空盒旋转角实时同步，保证阴影朝向与穹顶光照完全契合。
 
-- `F2` 后处理 on/off
-- `F3` IBL on/off
-- `F4` PCSS / PCF 切换
-- `F5` Bloom on/off
-- `TAB` 选择参数
-- `Left / Right` 调整参数
-- `Shift` 加速调节
-- `R` 重置
-
-可调项：
-
-- 曝光
-- Bloom 强度
-- Bloom 阈值
-- Bloom 半径
-- Shadow bias
-
-面板还显示当前地图的主光强度、环境光强度、点光源数量、IBL 漫反射强度、IBL 镜面强度、主光方向和天空旋转角。
-
-展示价值：面试时可以现场切换 IBL、PCSS 和后处理，让对方直接看到每个系统对画面的影响。
-
-## 技术亮点拆解
-
-### 数据驱动地图系统
-
-核心文件：
-
-- `resources/maps_config.json`
-- `include/map_manager.h`
-- `src/map_manager.cpp`
-- `src/map_resource_loader.cpp`
-
-亮点表达：
-
-> 我把地图的 HDR、地形、灯光、后处理、展示模型和出生点抽象进 JSON 配置，运行时切图会卸载旧资源、加载新资源并重建地形/生态。这让场景调参和美术迭代不依赖重新编译。
-
-### PBR 资源加载与材质识别
-
-核心文件：
-
-- `include/model.h`
-- `include/mesh.h`
-- `shaders/pbr_model.fs`
-- `src/pbr_prop_renderer.cpp`
-
-亮点表达：
-
-> 模型加载支持常见 PBR 贴图通道，并且在缺失材质声明时会尝试按贴图命名规则做 fallback。这样下载的 PBR 模型可以更快接入场景，适合作为技术美术展示流程。
-
-### HDR 到 IBL 预计算
-
-核心文件：
-
-- `src/resource_manager.cpp`
-- `shaders/hdr_to_cubemap.fs`
-- `shaders/irradiance.fs`
-- `shaders/prefilter.fs`
-- `shaders/brdf.fs`
-
-亮点表达：
-
-> HDR 天空盒加载后会转换成 cubemap，并预计算 irradiance、prefilter 和 BRDF LUT。PBR shader 使用这些贴图产生随地图变化的环境光照。
-
-### 阴影稳定性
-
-核心文件：
-
-- `src/shadow_mapper.cpp`
-- `src/shadow_pass_renderer.cpp`
-- `shaders/pbr_model.fs`
-- `shaders/terrain.fs`
-- `shaders/plane.fs`
-
-亮点表达：
-
-> 阴影不是只做一张深度图，还做了 camera-centered light frustum、texel snapping、PCF/PCSS 切换、shadow bias 调参和天空盒旋转同步主光方向。
-
-### 渲染模块拆分
-
-核心文件：
-
-- `src/game_manager.cpp`
-- `src/terrain_renderer.cpp`
-- `src/pbr_prop_renderer.cpp`
-- `src/post_process_renderer.cpp`
-- `src/hud_renderer.cpp`
-- `src/weapon_view_renderer.cpp`
-- `src/particle_renderer.cpp`
-
-亮点表达：
-
-> 项目早期渲染逻辑集中在 GameManager，后续拆成多个 renderer，让每个模块负责一个明确的渲染域。这样方便维护，也能减少 OpenGL 状态互相污染。
-
-## 推荐展示视频脚本
-
-建议录制 60-90 秒视频。
-
-### 片段 1：项目整体
-
-镜头：Nature 地图开场，移动视角看地形、树木、天空盒和目标球。
-
-讲解：
-
-> 这是一个 OpenGL 实时渲染与 FPS 交互 Demo。场景、灯光、HDR、地形和后处理都由地图配置驱动。
-
-### 片段 2：PBR + IBL
-
-镜头：靠近地图中的 PBR 展示模型，按 `F1` 打开 debug overlay，按 `F3` 切换 IBL。
-
-讲解：
-
-> PBR 模型接入了 HDR 生成的 IBL。关闭 IBL 后，模型只剩基础环境和直接光；打开后可以看到来自天空盒的漫反射和镜面环境光。
-
-### 片段 3：PCSS 软阴影
-
-镜头：观察模型或树木投影，按 `F4` 在 PCF / PCSS 之间切换，调节 shadow bias。
-
-讲解：
-
-> 阴影支持 PCF 和 PCSS 切换。PCSS 会根据 blocker 和 receiver 的深度关系改变过滤半径，让阴影边缘更柔和。
-
-### 片段 4：后处理
-
-镜头：切到 City 地图，打开 debug overlay，切换后处理和 bloom。
-
-讲解：
-
-> 后处理包含曝光、ACES tone mapping、暗角、色散、颗粒和 bloom。不同地图可以配置不同的视觉风格。
-
-### 片段 5：FPS 交互
-
-镜头：射击靶球，展示命中分数、combo、粒子、hit marker、屏幕震动和武器反馈。
-
-讲解：
-
-> 项目不是纯 shader 展示，还实现了 FPS 输入、射线命中、目标生命周期和反馈闭环。
-
-## 截图清单
-
-建议放到 `docs/images/`。
-
-| 文件名 | 内容 |
-| --- | --- |
-| `01_nature_overview.png` | Nature 地图全景，展示 HDR、地形和生态 |
-| `02_pbr_ibl_on_off.png` | PBR 模型 IBL on/off 对比 |
-| `03_pcss_shadow.png` | PCF / PCSS 阴影边缘对比 |
-| `04_city_postprocess.png` | City 地图后处理风格 |
-| `05_debug_overlay.png` | 中文 debug overlay 和调参项 |
-| `06_wireframe_terrain.png` | 线框模式展示高度图地形网格 |
-| `07_hit_feedback.png` | 射击命中、分数、粒子和 hit marker |
-
-## 构建与验证
-
-构建：
-
-```powershell
-.\vibe_build.bat
+<!-- PLACEHOLDER: PCF与PCSS阴影软度对比图 -->
+![Shadow Softness PCSS vs PCF](images/05_pcss_shadow.png)
+*(占位符：请将 PCF 与 PCSS 的效果对比图命名为 `05_pcss_shadow.png` 存放在 `docs/images/` 目录下)*
+
+---
+
+### 3. 后处理滤镜与电影级色彩分级
+后处理管线采用高动态范围 (HDR) FBO，集成多种后期滤镜：
+* **色彩分级**：支持曝光缩放 (Exposure)、对比度 (Contrast) 调节、饱和度 (Saturation) 微调、暗角 (Vignette)、色散 (Chromatic Aberration) 与胶片颗粒 (Film Grain)。
+* **ACES Tone Mapping**：使用电影级 ACES 曲线映射高动态颜色，解决天空盒及强光源过曝截断问题，使光影过渡更加平滑。
+* **Bloom (光晕效果)**：明亮提取 (Bright-pass) 后进行高斯模糊 (Gaussian Blur) 并叠加，呈现物体的高光溢出质感。
+* **水下扭曲与红光吸收**：专门为 Ocean 地图设计，在屏幕空间实现了水流的正弦波动畸变，并随着相机深度吸收红光分量，模拟真实深海视效。
+
+<!-- PLACEHOLDER: 后处理效果/水下效果展示图 -->
+![Underwater Post Process Effect](images/06_underwater_postprocess.png)
+*(占位符：请将水下后处理或 Bloom 对比图命名为 `06_underwater_postprocess.png` 存放在 `docs/images/` 目录下)*
+
+---
+
+### 4. 数据驱动的场景与高度图地形
+* **配置驱动**：通过 `resources/maps_config.json` 控制地图名称、HDR 天空盒、地表材质、地形参数、主光源方向、点光源数组、PBR 装饰模型及位置坐标。
+* **高度图重建**：支持 8-bit/16-bit 灰度高度图加载。着色器根据网格顶点位置采样高度并重新计算像素法线；C++ 端则缓存高度数据，为角色及生态对象贴地提供运行时高度查询支持。
+* **程序化生态系统 (Ecology)**：系统根据地形的海拔、坡度及间距因子，自动通过 GPU Instancing 渲染海草、珊瑚、树木等生态网格，保证场景细节丰富的同时维持高帧率。
+
+<!-- PLACEHOLDER: 地形网格线框模式截图 -->
+![Wireframe Terrain Network](images/07_wireframe_terrain.png)
+*(占位符：请将 F1 面板或线框网格截图命名为 `07_wireframe_terrain.png` 存放在 `docs/images/` 目录下)*
+
+---
+
+### 5. 第一人称射击 (FPS) 交互闭环
+项目不仅是渲染展示，还集成了 Aim Lab 式的射击交互闭环：
+* **物理反馈**：实现了第一人称相机移动、碰撞约束、武器模型绘制、枪口火光 (Muzzle Flash) 粒子、开火后坐力 (Recoil)。
+* **命中检测**：利用射线检测 (Raycasting) 对靶球包围盒进行精准命中判定。
+* **交互特效**：命中后触发屏幕抖动 (Screen Shake)、靶球破碎粒子特效、准心伤害红边提示 (Hit Marker)、击碎音效/视觉反馈，并实时更新 Combo 及得分。
+
+<!-- PLACEHOLDER: 命中靶球反馈截图 -->
+![FPS Shooting Hit Feedback](images/08_hit_feedback.png)
+*(占位符：请将射击命中瞬间的粒子和特效截图命名为 `08_hit_feedback.png` 存放在 `docs/images/` 目录下)*
+
+---
+
+### 6. Debug 交互控制台与模块化重构
+按 `F1` 键可调出运行时中文参数面板，支持热键操作以在面试或展示时直观展示画面变化：
+* `F2`：开关屏幕空间后处理 (Post-Processing)
+* `F3`：开关基于图像的环境光照 (IBL)
+* `F4`：在 PCF 与 PCSS 软阴影模式之间进行切换
+* `F5`：开关光晕提取与高斯模糊 (Bloom)
+* `SPACE`：开关线框模式以查看地形和模型网格
+* `1 / 2 / 3`：热切换地图场景
+* `TAB` & `← / →`：手动微调当前的曝光、Bloom 强度/半径/阈值、Shadow Bias 参数并实时查看画面效果。
+
+<!-- PLACEHOLDER: Debug 控制台调参界面截图 -->
+![Debug Overlay Showcase](images/09_debug_overlay.png)
+*(占位符：请将参数调整界面的截图命名为 `09_debug_overlay.png` 存放在 `docs/images/` 目录下)*
+
+---
+
+## 📂 核心代码展示
+
+### ACES 电影级色调映射与色彩调整
+以下为 [post_process.fs](file:///d:/course/over-learn/OpenGL/project/opengl_try/shaders/post_process.fs) 的后处理核心片段，展示了曝光调节、ACES 映射、对比度、饱和度及暗角的组合实现：
+
+```glsl
+#version 330 core
+out vec4 FragColor;
+in vec2 TexCoords;
+
+uniform sampler2D sceneTexture;
+uniform sampler2D bloomTexture;
+
+// 画面分级参数
+const float exposure = 0.62;
+const float contrast = 1.03;
+const float saturation = 1.02;
+const float vignette = 0.08;
+
+// ACES Tone Mapping 拟合函数
+vec3 ACESFilm(vec3 x) {
+    float a = 2.51f;
+    float b = 0.03f;
+    float c = 2.43f;
+    float d = 0.59f;
+    float e = 0.14f;
+    return clamp((x*(a*x+b))/(x*(c*x+d)+e), 0.0, 1.0);
+}
+
+void main() {
+    vec3 color = texture(sceneTexture, TexCoords).rgb;
+    
+    // 1. 曝光缩放
+    color *= exposure;
+    
+    // 2. 电影级 ACES Tone Mapping 映射到 [0,1]
+    color = ACESFilm(color);
+    
+    // 3. 对比度调整 (以 0.5 为基准进行线性拉伸)
+    color = (color - 0.5) * contrast + 0.5;
+    
+    // 4. 饱和度调整 (利用亮度系数灰度化后混合)
+    float luminance = dot(color, vec3(0.2126, 0.7152, 0.0722));
+    color = mix(vec3(luminance), color, saturation);
+    
+    // 5. 屏幕边缘暗角 (Vignette) 遮罩
+    vec2 uv = TexCoords - 0.5;
+    float dist = dot(uv, uv);
+    color *= (1.0 - dist * vignette);
+    
+    FragColor = vec4(color, 1.0);
+}
 ```
 
-Smoke run：
+---
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\smoke_build_run.ps1 -RunSeconds 15
-```
+## 📈 项目收获与反思
 
-当前 smoke 主要验证：
-
-- 程序可启动
-- 地图配置可加载
-- HDR / IBL 预计算路径可运行
-- PBR 模型可加载
-- 字体系统可初始化
-
-## 已知限制与后续优化
-
-当前项目已经可以作为作品集展示，但还有几个可以继续加分的方向：
-
-- 增加截图自动保存或简单 replay camera，方便稳定录制展示视频。
-- 增加 shadow debug view，直接显示 shadow map 和 light frustum。
-- 进一步优化 PCSS 采样核，从 16 sample 提升到 32/64 sample 或分层采样。
-- 为 PBR 模型加入材质通道可视化，例如 albedo/normal/metallic/roughness 单独查看。
-- 将后处理拆成更完整的多级 mip bloom，获得更接近商业引擎的 bloom 质感。
-- 增加 GPU timer query，展示各 pass 的耗时。
-
-## 面试时可以强调的结论
-
-这个项目的重点不是“某一个 shader 写完了”，而是把多个实时渲染模块组织成一个可运行、可切换、可调参、可交互的 Demo：
-
-- 技术美术角度：展示 PBR、IBL、HDR、PCSS、后处理、地图光照配置和调参面板。
-- 游戏客户端角度：展示 C++ 模块化、资源管理、输入、射线命中、HUD、粒子、武器反馈和 smoke 验证。
-- 工程角度：展示从原型到重构的过程，包括编码统一、结构整理、renderer 拆分、状态 guard 和本地 git 提交记录。
+* **渲染状态管理**：通过实现 `GLStateGuard` 类，对混合深度测试、面剔除、写入遮罩等 transient OpenGL 状态进行局部保护，避免了复杂的后处理和 UI 流程破坏主管线的 PBR/阴影绑定状态。
+* **内存与资源安全**：摒弃了裸指针，项目整体基于 C++ **RAII** 规范，使用 `std::unique_ptr` 进行 Shader、Mesh、FBO 的生命周期自治，消除了渲染器切换导致的 VRAM 泄漏。
+* **数据驱动意识**：不仅用配置控制资产路径，还将物理常量（如光源半角、材质曝光系数）提炼到 JSON 配置文件中，大幅度缩短了美术和逻辑调优的等待时间。
