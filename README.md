@@ -81,23 +81,6 @@ DLL/                      Runtime third-party DLLs
 - `1/2/3`：切换地图
 - `ESC`：退出
 
-## 构建与验证
-
-推荐配置：`Debug|x64`
-
-```powershell
-.\vibe_build.bat
-```
-
-也可以运行 smoke 检查：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\smoke_build_run.ps1 -RunSeconds 15
-```
-
-当前已知警告：`LNK4098 MSVCRT` 来自本地 `glfw3.lib` 与 Debug 运行库不匹配，不影响当前可执行文件生成。彻底消除需要替换或重编匹配 VS2022 运行库配置的 GLFW 库。
-
-
 ## 编码约定
 
 项目文本文件统一使用 UTF-8。C++ 编译配置显式启用 `/utf-8`，避免 Visual Studio 或系统代码页把源码按 GB2312/ANSI 误读。
