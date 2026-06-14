@@ -1,18 +1,13 @@
 # OpenGL FPS Aim Lab Demo
 
-一个基于 C++17 / OpenGL 3.3 的第一人称射击交互与实时渲染 Demo，定位为技术美术 / 游戏客户端开发作品集项目。项目重点展示 PBR/IBL、HDR 天空盒、高度图地形、PCSS 阴影、后处理、多地图配置化、射击命中反馈和模块化客户端架构。
+一个基于 C++17 / OpenGL 3.3 的第一人称射击交互与实时渲染系统。项目重点实现了 PBR/IBL、HDR 天空盒、高度图地形、PCSS 阴影、后处理、多地图配置化、射击命中反馈和模块化客户端架构。
 
-## 作品集文档
+## 项目特点
 
-- [作品集说明与展示脚本](docs/portfolio.md)
-- 展示截图建议放在 `docs/images/`
+这个项目不仅是单一的 Shader 练习，而是一个完整的小型实时渲染与 FPS 交互系统，具备以下核心特点：
 
-## 项目定位
-
-这个项目不是单一 shader 练习，而是一个小型实时渲染与 FPS 交互框架。它适合在作品集中展示两类能力：
-
-- 技术美术方向：PBR/IBL 管线、HDR 环境光、高度图地形、PCSS 软阴影、后处理风格化、场景参数配置化。
-- 游戏客户端方向：C++ 模块化架构、OpenGL 资源管理、输入与相机、射线命中、对象生命周期、HUD、粒子和运行时地图切换。
+- 渲染管线与光影：包含 PBR/IBL 管线、HDR 环境光、高度图地形、PCSS 软阴影、后处理风格化，且支持场景参数配置化。
+- 系统设计与交互：采用 C++ 模块化架构，实现了 OpenGL 资源管理、输入与相机控制、射线命中判定、对象生命周期管理、HUD 界面、粒子系统和运行时地图无缝切换。
 
 ## 技术栈
 
@@ -42,15 +37,15 @@ DLL/                      Runtime third-party DLLs
 
 ## 主要模块
 
-| 模块 | 文件 | 展示价值 |
+| 模块 | 文件 | 功能职责与技术细节 |
 | --- | --- | --- |
 | 游戏主循环 | `src/main.cpp`, `include/game_manager.h`, `src/game_manager.cpp` | 初始化、输入、更新、渲染和资源释放的完整客户端框架 |
 | 资源管理 | `include/resource_manager.h`, `src/resource_manager.cpp` | Shader、Texture、Cubemap、HDR、IBL 资源加载、缓存与释放 |
-| 地图配置 | `include/map_manager.h`, `src/map_manager.cpp`, `resources/maps_config.json` | 用 JSON 驱动天空盒、地形、地表纹理、出生点、灯光和 PBR 展示物 |
+| 地图配置 | `include/map_manager.h`, `src/map_manager.cpp`, `resources/maps_config.json` | 用 JSON 驱动天空盒、地形、地表纹理、出生点、灯光和 PBR 摆放物 |
 | 高度图地形 | `include/terrain.h`, `src/terrain.cpp` | 8/16-bit 高度图、法线重建、GPU 网格上传、运行时高度查询 |
 | PBR 与 IBL | `shaders/pbr_model.*`, `shaders/irradiance.fs`, `shaders/prefilter.fs`, `shaders/brdf.fs` | Cook-Torrance、Fresnel、预滤波环境贴图、BRDF LUT、tone mapping |
 | 阴影系统 | `include/shadow_mapper.h`, `src/shadow_mapper.cpp`, `src/shadow_pass_renderer.cpp` | 主光源深度图、软阴影采样、地图光照方向联动 |
-| 后处理 | `include/post_process_renderer.h`, `src/post_process_renderer.cpp`, `shaders/post_process.fs` | 屏幕空间滤镜、曝光、色调映射和展示风格控制 |
+| 后处理 | `include/post_process_renderer.h`, `src/post_process_renderer.cpp`, `shaders/post_process.fs` | 屏幕空间滤镜、曝光、色调映射和画面风格控制 |
 | 程序化生态 | `include/ecology_system.h`, `src/ecology_system.cpp` | 按地形高度、坡度和间距布置生态对象 |
 | 射击反馈 | `include/raycast.h`, `include/target_manager.h`, `include/weapon.h` | 输入、射线判定、分数、粒子、HUD 和屏幕震动闭环 |
 | 粒子系统 | `include/particle_system.h`, `src/particle_system.cpp` | 固定容量对象池、free list 分配、GPU instancing |
@@ -102,15 +97,6 @@ powershell -ExecutionPolicy Bypass -File .\scripts\smoke_build_run.ps1 -RunSecon
 
 当前已知警告：`LNK4098 MSVCRT` 来自本地 `glfw3.lib` 与 Debug 运行库不匹配，不影响当前可执行文件生成。彻底消除需要替换或重编匹配 VS2022 运行库配置的 GLFW 库。
 
-## 作品集展示建议
-
-推荐录制 60-90 秒视频：
-
-1. 进入 Nature 地图，展示 HDR 天空盒、地形和生态对象。
-2. 靠近 PBR 展示模型，说明 IBL 环境光和材质贴图。
-3. 切换地图，展示不同 HDR、地表和灯光参数。
-4. 开火命中靶球，展示粒子、分数、combo、hit marker、屏幕震动和武器反馈。
-5. 切换线框模式，展示高度图地形网格和客户端调试能力。
 
 ## 编码约定
 
