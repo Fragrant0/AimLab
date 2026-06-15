@@ -1,0 +1,244 @@
+{
+  "maps": [
+    {
+      "name": "Space",
+      "skybox_type": "hdr",
+      "skybox_hdr": "resources/textures/skybox_hdr/rogland_clear_night_1k.hdr",
+      "floor_texture": "resources/textures/ground/space_aerial_rocks_02_diff_1k.jpg",
+      "floor_texture_name": "floor_space",
+      "ambient_color": [0.1, 0.1, 0.2],
+      "ambient_intensity": 0.24,
+      "lighting": {
+        "main_light": {
+          "direction": [-0.25, -0.85, -0.35],
+          "color": [0.72, 0.82, 1.0],
+          "intensity": 0.72,
+          "sync_with_skybox_rotation": true,
+          "skybox_rotation_offset": 0.0,
+          "angular_size": 0.065
+        },
+        "ambient": {
+          "ibl_diffuse_intensity": 0.35,
+          "ibl_specular_intensity": 0.58,
+          "ambient_intensity": 0.24
+        },
+        "point_lights": [
+          {
+            "position": [4.0, 4.0, -7.0],
+            "color": [0.2, 0.75, 1.0],
+            "intensity": 1.7,
+            "range": 12.0
+          },
+          {
+            "position": [-4.0, 2.8, -5.0],
+            "color": [1.0, 0.35, 0.2],
+            "intensity": 1.1,
+            "range": 9.0
+          }
+        ]
+      },
+      "post_process": {
+        "exposure": 0.62,
+        "gamma": 2.2,
+        "contrast": 1.08,
+        "saturation": 1.05,
+        "vignette": 0.2,
+        "chromatic_aberration": 0.0012,
+        "film_grain": 0.015,
+        "bloom": {
+          "enabled": true,
+          "threshold": 1.0,
+          "intensity": 0.03,
+          "radius": 0.6
+        }
+      },
+      "spawn_radius": 24.0,
+      "terrain": "heightmap",
+      "ecology_enabled": false,
+      "heightmap": {
+        "path": "resources/textures/heightmaps/Rugged Terrain with Rocky Peaks Height Map PNG.png",
+        "height_scale": 18.0,
+        "grid_size": 256,
+        "size": 70.0
+      },
+      "player_start": [0.0, 3.0, 8.0],
+      "props": [
+        {
+          "model": "resources/objects/scifi_helmet/SciFiHelmet.gltf",
+          "position": [0.0, 0.35, -12.0],
+          "rotation": [0.0, 180.0, 0.0],
+          "scale": 1.0,
+          "target_height": 3.0,
+          "pbr_brightness": 1.12,
+          "pbr_ambient_intensity": 0.48,
+          "pbr_ambient_color": [0.78, 0.9, 1.0]
+        }
+      ],
+      "target_area": {
+        "wall_distance": 12.0,
+        "wall_width": 10.0,
+        "wall_height": 6.0,
+        "wall_center_y": 2.0,
+        "lifetime": 4.0
+      }
+    },
+    {
+      "name": "Nature",
+      "skybox_type": "hdr",
+      "skybox_hdr": "resources/textures/skybox_hdr/citrus_orchard_road_puresky_1k.hdr",
+      "floor_texture": "resources/textures/Rugged Terrain with Rocky Peaks Diffuse PNG.png",
+      "floor_texture_name": "floor_nature",
+      "ambient_color": [0.2, 0.3, 0.2],
+      "ambient_intensity": 0.24,
+      "lighting": {
+        "main_light": {
+          "direction": [-0.42, -0.88, -0.18],
+          "color": [1.0, 0.92, 0.72],
+          "intensity": 0.72,
+          "sync_with_skybox_rotation": true,
+          "skybox_rotation_offset": 0.25,
+          "angular_size": 0.045
+        },
+        "ambient": {
+          "ibl_diffuse_intensity": 0.38,
+          "ibl_specular_intensity": 0.55,
+          "ambient_intensity": 0.24
+        },
+        "point_lights": [
+          {
+            "position": [6.0, 34.0, -7.0],
+            "color": [1.0, 0.68, 0.35],
+            "intensity": 1.35,
+            "range": 13.0
+          }
+        ]
+      },
+      "post_process": {
+        "exposure": 0.62,
+        "gamma": 2.2,
+        "contrast": 1.08,
+        "saturation": 1.06,
+        "vignette": 0.14,
+        "chromatic_aberration": 0.0,
+        "film_grain": 0.006,
+        "bloom": {
+          "enabled": true,
+          "threshold": 1.0,
+          "intensity": 0.02,
+          "radius": 0.5
+        }
+      },
+      "spawn_radius": 30.0,
+      "terrain": "heightmap",
+      "ecology_enabled": true,
+      "heightmap": {
+        "path": "resources/textures/heightmaps/Rugged Terrain with Rocky Peaks Height Map PNG.png",
+        "height_scale": 60.0,
+        "grid_size": 256,
+        "size": 60.0
+      },
+      "player_start": [0.0, 3.0, 5.0],
+      "props": [
+        {
+          "model": "resources/objects/avocado/Avocado.gltf",
+          "position": [0.0, 0.35, -10.0],
+          "rotation": [0.0, 30.0, 0.0],
+          "scale": 1.0,
+          "target_height": 2.2,
+          "pbr_brightness": 1.08,
+          "pbr_ambient_intensity": 0.55,
+          "pbr_ambient_color": [1.0, 0.92, 0.76]
+        }
+      ],
+      "target_area": {
+        "wall_distance": 18.0,
+        "wall_width": 14.0,
+        "wall_height": 10.0,
+        "wall_center_y": 3.0,
+        "lifetime": 5.0
+      }
+    },
+    {
+      "name": "City",
+      "skybox_type": "hdr",
+      "skybox_hdr": "resources/textures/skybox_hdr/urban_street_04_1k.hdr",
+      "floor_texture": "resources/textures/ground/city_asphalt_02_diff_1k.jpg",
+      "floor_texture_name": "floor_city",
+      "ambient_color": [0.3, 0.3, 0.3],
+      "ambient_intensity": 0.22,
+      "lighting": {
+        "main_light": {
+          "direction": [-0.15, -0.72, -0.65],
+          "color": [0.86, 0.92, 1.0],
+          "intensity": 0.68,
+          "sync_with_skybox_rotation": true,
+          "skybox_rotation_offset": -0.35,
+          "angular_size": 0.08
+        },
+        "ambient": {
+          "ibl_diffuse_intensity": 0.3,
+          "ibl_specular_intensity": 0.58,
+          "ambient_intensity": 0.22
+        },
+        "point_lights": [
+          {
+            "position": [3.5, 2.8, -6.0],
+            "color": [1.0, 0.44, 0.18],
+            "intensity": 1.8,
+            "range": 9.0
+          },
+          {
+            "position": [-3.5, 2.6, -6.5],
+            "color": [0.15, 0.45, 1.0],
+            "intensity": 1.6,
+            "range": 9.0
+          }
+        ]
+      },
+      "post_process": {
+        "exposure": 0.62,
+        "gamma": 2.2,
+        "contrast": 1.1,
+        "saturation": 1.03,
+        "vignette": 0.24,
+        "chromatic_aberration": 0.0018,
+        "film_grain": 0.02,
+        "bloom": {
+          "enabled": true,
+          "threshold": 1.0,
+          "intensity": 0.04,
+          "radius": 0.65
+        }
+      },
+      "spawn_radius": 18.0,
+      "terrain": "heightmap",
+      "ecology_enabled": false,
+      "heightmap": {
+        "path": "resources/textures/heightmaps/Rugged Terrain with Rocky Peaks Height Map PNG.png",
+        "height_scale": 3.0,
+        "grid_size": 256,
+        "size": 48.0
+      },
+      "player_start": [0.0, 3.0, 6.0],
+      "props": [
+        {
+          "model": "resources/objects/boombox/BoomBox.gltf",
+          "position": [0.0, 0.18, -7.0],
+          "rotation": [0.0, 205.0, 0.0],
+          "scale": 1.0,
+          "target_height": 2.2,
+          "pbr_brightness": 1.1,
+          "pbr_ambient_intensity": 0.5,
+          "pbr_ambient_color": [0.9, 0.95, 1.0]
+        }
+      ],
+      "target_area": {
+        "wall_distance": 15.0,
+        "wall_width": 12.0,
+        "wall_height": 8.0,
+        "wall_center_y": 2.5,
+        "lifetime": 4.5
+      }
+    }
+  ]
+}

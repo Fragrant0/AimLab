@@ -1,0 +1,21 @@
+#version 330 core
+layout (location = 0) in vec3 aPos;
+layout (location = 1) in vec3 aNormal;
+
+out vec2 TexCoord;
+out float LifeRatio;
+
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+uniform float lifeRatio;
+
+void main()
+{
+    vec4 worldPos = model * vec4(aPos, 1.0);
+    gl_Position = projection * view * worldPos;
+    
+    // 将位置映射到纹理坐标 (0-1范围)
+    TexCoord = aPos.xy / 0.08f + 0.5f;
+    LifeRatio = lifeRatio;
+}
