@@ -17,7 +17,8 @@ void PBRPropRenderer::Render(const MapConfig& map,
                              const ShadowMapper* shadowMapper,
                              bool iblEnabled,
                              bool pcssEnabled,
-                             float shadowBias)
+                             float shadowBias,
+                             float skyboxRotation)
 {
     if (models.empty())
         return;
@@ -30,6 +31,7 @@ void PBRPropRenderer::Render(const MapConfig& map,
     shader->setVec3("cameraPos", camera.Position);
     shader->setMat4("projection", projection);
     shader->setMat4("view", view);
+    shader->setFloat("u_EnvironmentRotation", skyboxRotation);
     ApplyLighting(*shader, map, mainLightDirection, shadowMapper, iblEnabled, pcssEnabled, shadowBias);
     BindEnvironmentMaps(*shader);
 

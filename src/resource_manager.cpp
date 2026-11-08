@@ -10,6 +10,71 @@
 
 namespace
 {
+    using ImageOwner = std::unique_ptr<void, decltype(&stbi_image_free)>;
+
+    struct TextureUploadState
+    {
+        TextureUploadState()
+        {
+            glGetIntegerv(GL_TEXTURE_BINDING_2D, &Previous2D);
+            glGetIntegerv(GL_TEXTURE_BINDING_CUBE_MAP, &PreviousCubemap);
+            glGetIntegerv(GL_UNPACK_ALIGNMENT, &PreviousAlignment);
+        }
+        ~TextureUploadState()
+        {
+            glBindTexture(GL_TEXTURE_2D, Previous2D);
+            glBindTexture(GL_TEXTURE_CUBE_MAP, PreviousCubemap);
+            glPixelStorei(GL_UNPACK_ALIGNMENT, PreviousAlignment);
+        }
+        GLint Previous2D = 0;
+        GLint PreviousCubemap = 0;
+        GLint PreviousAlignment = 4;
+    };
+
+    GLenum ImageFormat(int components, const std::string& path)
+    {
+        switch (components)
+        {
+        case 1: return GL_RED;
+        case 2: return GL_RG;
+        case 3: return GL_RGB;
+        case 4: return GL_RGBA;
+        default: throw std::runtime_error("[ResourceManager] Unsupported image channels: " + path);
+        }
+    }
+
+    std::runtime_error ImageLoadError(const std::string& path)
+    {
+        const char* reason = stbi_failure_reason();
+        return std::runtime_error("[ResourceManager] Failed to load image '" + path + "': " +
+            (reason ? reason : "unknown decoder error"));
+    }
+
+    void CheckImageDimensions(int width, int height, const std::string& path)
+    {
+        GLint maxSize = 0;
+        glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxSize);
+        if (width <= 0 || height <= 0 || width > maxSize || height > maxSize)
+            throw std::runtime_error("[ResourceManager] Invalid image dimensions: " + path);
+    }
+
+    void CheckImageStorage(GLenum target, int width, int height, const std::string& path)
+    {
+        GLint actualWidth = 0;
+        GLint actualHeight = 0;
+        glGetTexLevelParameteriv(target, 0, GL_TEXTURE_WIDTH, &actualWidth);
+        glGetTexLevelParameteriv(target, 0, GL_TEXTURE_HEIGHT, &actualHeight);
+        if (actualWidth != width || actualHeight != height)
+            throw std::runtime_error("[ResourceManager] Failed to allocate image storage: " + path);
+    }
+
+    void DeleteTextureCache(std::map<std::string, unsigned int>& cache) noexcept
+    {
+        for (const auto& entry : cache)
+            if (entry.second) glDeleteTextures(1, &entry.second);
+        cache.clear();
+    }
+
     struct TextureOwner
     {
         explicit TextureOwner(unsigned int texture = 0) : ID(texture) {}
@@ -93,6 +158,45 @@ ResourceManager& ResourceManager::GetInstance()
     return instance;
 }
 
+ResourceManager::MapLoadTransaction ResourceManager::BeginMapLoad()
+{
+    return MapLoadTransaction(*this);
+}
+
+ResourceManager::MapLoadTransaction::MapLoadTransaction(ResourceManager& manager)
+    : m_Manager(manager)
+{
+    if (m_Manager.m_MapLoadActive)
+        throw std::logic_error("[ResourceManager] Nested map-load transactions are not supported.");
+    m_Manager.m_MapLoadActive = true;
+    SwapCaches();
+}
+
+void ResourceManager::MapLoadTransaction::SwapCaches() noexcept
+{
+    m_PreviousCaches[0].swap(m_Manager.m_Textures);
+    m_PreviousCaches[1].swap(m_Manager.m_Cubemaps);
+    m_PreviousCaches[2].swap(m_Manager.m_HDRTextures);
+    m_PreviousCaches[3].swap(m_Manager.m_HDRSkyboxes);
+    m_PreviousCaches[4].swap(m_Manager.m_IrradianceMaps);
+    m_PreviousCaches[5].swap(m_Manager.m_PrefilterMaps);
+}
+
+ResourceManager::MapLoadTransaction::~MapLoadTransaction() noexcept
+{
+    if (m_Committed)
+    {
+        for (auto& cache : m_PreviousCaches)
+            DeleteTextureCache(cache);
+    }
+    else
+    {
+        m_Manager.ClearMapResources();
+        SwapCaches();
+    }
+    m_Manager.m_MapLoadActive = false;
+}
+
 Shader* ResourceManager::LoadShader(const std::string& name, const char* vertexPath, const char* fragmentPath)
 {
     auto existing = m_Shaders.find(name);
@@ -125,66 +229,33 @@ unsigned int ResourceManager::LoadTexture(const std::string& name, const char* p
         return m_Textures[name];
     }
 
-    unsigned int textureID = 0;
-    glGenTextures(1, &textureID);
+    if (!path || !*path)
+        throw std::runtime_error("[ResourceManager] Empty texture path for: " + name);
 
-    int width, height, nrComponents;
-    unsigned char* data = stbi_load(path, &width, &height, &nrComponents, 0);
-    if (data)
-    {
-        GLenum format = GL_RGB;
-        GLenum internalFormat = GL_RGB;
-        if (nrComponents == 1)
-        {
-            format = GL_RED;
-            internalFormat = GL_RED;
-        }
-        else if (nrComponents == 2)
-        {
-            format = GL_RG;
-            internalFormat = GL_RG;
-        }
-        else if (nrComponents == 3)
-        {
-            format = GL_RGB;
-            internalFormat = GL_RGB;
-        }
-        else if (nrComponents == 4)
-        {
-            format = GL_RGBA;
-            internalFormat = GL_RGBA;
-        }
+    int width = 0, height = 0, nrComponents = 0;
+    ImageOwner data(stbi_load(path, &width, &height, &nrComponents, 0), stbi_image_free);
+    if (!data)
+        throw ImageLoadError(path);
+    CheckImageDimensions(width, height, path);
+    const GLenum format = ImageFormat(nrComponents, path);
+    TextureUploadState state;
+    TextureOwner texture;
+    glGenTextures(1, &texture.ID);
+    if (!texture.ID)
+        throw std::runtime_error("[ResourceManager] Failed to allocate texture: " + std::string(path));
+    glBindTexture(GL_TEXTURE_2D, texture.ID);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data.get());
+    CheckImageStorage(GL_TEXTURE_2D, width, height, path);
+    if (nrComponents != 1)
+        glGenerateMipmap(GL_TEXTURE_2D);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, nrComponents == 1 ? GL_LINEAR : GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
-        glBindTexture(GL_TEXTURE_2D, textureID);
-        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-        glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, format, GL_UNSIGNED_BYTE, data);
-        if (nrComponents == 1)
-        {
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        }
-        else
-        {
-            glGenerateMipmap(GL_TEXTURE_2D);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        }
-
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-
-        stbi_image_free(data);
-    }
-    else
-    {
-        std::cout << "Texture failed to load at path: " << path << std::endl;
-        stbi_image_free(data);
-        glDeleteTextures(1, &textureID);
-        return 0;
-    }
-
-    m_Textures[name] = textureID;
-    return textureID;
+    m_Textures.emplace(name, texture.ID);
+    return texture.Release();
 }
 
 unsigned int ResourceManager::GetTexture(const std::string& name)
@@ -211,30 +282,35 @@ void ResourceManager::UnloadTexture(const std::string& name)
 
 unsigned int ResourceManager::LoadCubemap(const std::string& name, const std::vector<std::string>& faces)
 {
+    if (faces.size() != 6)
+        throw std::runtime_error("[ResourceManager] Cubemap '" + name + "' requires exactly six face paths.");
     if (m_Cubemaps.find(name) != m_Cubemaps.end())
     {
         return m_Cubemaps[name];
     }
 
+    TextureUploadState state;
     TextureOwner texture;
     unsigned int& textureID = texture.ID;
     glGenTextures(1, &textureID);
+    if (!textureID)
+        throw std::runtime_error("[ResourceManager] Failed to allocate cubemap: " + name);
     glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
-    int width, height, nrChannels;
+    int faceSize = 0;
     for (unsigned int i = 0; i < faces.size(); i++)
     {
-        unsigned char* data = stbi_load(faces[i].c_str(), &width, &height, &nrChannels, 0);
-        if (data)
-        {
-            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
-            stbi_image_free(data);
-        }
-        else
-        {
-            std::cout << "Cubemap texture failed to load at path: " << faces[i] << std::endl;
-            stbi_image_free(data);
-        }
+        int width = 0, height = 0, nrChannels = 0;
+        ImageOwner data(stbi_load(faces[i].c_str(), &width, &height, &nrChannels, STBI_rgb), stbi_image_free);
+        if (!data)
+            throw ImageLoadError(faces[i]);
+        CheckImageDimensions(width, height, faces[i]);
+        if (width != height || (i != 0 && width != faceSize))
+            throw std::runtime_error("[ResourceManager] Cubemap faces must be equally sized squares: " + faces[i]);
+        faceSize = width;
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data.get());
+        CheckImageStorage(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, width, height, faces[i]);
     }
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -297,69 +373,44 @@ unsigned int ResourceManager::LoadHDRTexture(const std::string& name, const char
         return m_HDRTextures[name];
     }
 
-    int width, height, nrComponents;
-    bool isHDR = stbi_is_hdr(path);
+    if (!path || !*path)
+        throw std::runtime_error("[ResourceManager] Empty HDR image path for: " + name);
 
-    unsigned int hdrTexture = 0;
-
+    int width = 0, height = 0, nrComponents = 0;
+    const bool isHDR = stbi_is_hdr(path) != 0;
+    ImageOwner data(nullptr, stbi_image_free);
     if (isHDR)
     {
         stbi_set_flip_vertically_on_load(true);
-        float* data = stbi_loadf(path, &width, &height, &nrComponents, 0);
+        data.reset(stbi_loadf(path, &width, &height, &nrComponents, STBI_rgb));
         stbi_set_flip_vertically_on_load(false);
-
-        if (data)
-        {
-            glGenTextures(1, &hdrTexture);
-            glBindTexture(GL_TEXTURE_2D, hdrTexture);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, data);
-
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-            stbi_image_free(data);
-            std::cout << "HDR texture loaded: " << path << " (" << width << "x" << height << ")" << std::endl;
-        }
-        else
-        {
-            std::cout << "Failed to load HDR texture: " << path << std::endl;
-            stbi_image_free(data);
-        }
     }
     else
     {
-        unsigned char* data = stbi_load(path, &width, &height, &nrComponents, 0);
-        if (data)
-        {
-            GLenum format = GL_RGB;
-            if (nrComponents == 4) format = GL_RGBA;
-
-            glGenTextures(1, &hdrTexture);
-            glBindTexture(GL_TEXTURE_2D, hdrTexture);
-            glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
-
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-            stbi_image_free(data);
-            std::cout << "HDR texture loaded (from LDR): " << path << " (" << width << "x" << height << ")" << std::endl;
-        }
-        else
-        {
-            std::cout << "Failed to load HDR texture: " << path << std::endl;
-            stbi_image_free(data);
-        }
+        data.reset(stbi_load(path, &width, &height, &nrComponents, 0));
     }
+    if (!data)
+        throw ImageLoadError(path);
+    CheckImageDimensions(width, height, path);
 
-    if (hdrTexture == 0)
-        return 0;
-
-    TextureOwner texture(hdrTexture);
-    m_HDRTextures[name] = hdrTexture;
+    const GLenum format = isHDR ? GL_RGB : ImageFormat(nrComponents, path);
+    TextureUploadState state;
+    TextureOwner texture;
+    glGenTextures(1, &texture.ID);
+    if (!texture.ID)
+        throw std::runtime_error("[ResourceManager] Failed to allocate HDR texture: " + std::string(path));
+    glBindTexture(GL_TEXTURE_2D, texture.ID);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glTexImage2D(GL_TEXTURE_2D, 0, isHDR ? GL_RGB16F : format, width, height, 0, format,
+        isHDR ? GL_FLOAT : GL_UNSIGNED_BYTE, data.get());
+    CheckImageStorage(GL_TEXTURE_2D, width, height, path);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    std::cout << (isHDR ? "HDR texture loaded: " : "HDR texture loaded (from LDR): ")
+              << path << " (" << width << "x" << height << ")" << std::endl;
+    m_HDRTextures.emplace(name, texture.ID);
     return texture.Release();
 }
 
@@ -395,11 +446,6 @@ unsigned int ResourceManager::LoadHDRSkybox(const std::string& name, const char*
     const std::string hdrName = name + "_hdr";
     const bool hadHDRTexture = m_HDRTextures.find(hdrName) != m_HDRTextures.end();
     unsigned int hdrTexture = LoadHDRTexture(hdrName, hdrPath);
-    if (hdrTexture == 0)
-    {
-        return 0;
-    }
-
     try
     {
         TextureOwner cubemap(CreateCubemapFromHDR(hdrTexture, 512));
@@ -863,45 +909,20 @@ unsigned int ResourceManager::GetBRDFLUT()
     return m_BRDFLUT;
 }
 
+void ResourceManager::ClearMapResources() noexcept
+{
+    DeleteTextureCache(m_Textures);
+    DeleteTextureCache(m_Cubemaps);
+    DeleteTextureCache(m_HDRTextures);
+    DeleteTextureCache(m_HDRSkyboxes);
+    DeleteTextureCache(m_IrradianceMaps);
+    DeleteTextureCache(m_PrefilterMaps);
+}
+
 void ResourceManager::Clear()
 {
     m_Shaders.clear();
-
-    for (auto& pair : m_Textures)
-    {
-        glDeleteTextures(1, &pair.second);
-    }
-    m_Textures.clear();
-
-    for (auto& pair : m_Cubemaps)
-    {
-        glDeleteTextures(1, &pair.second);
-    }
-    m_Cubemaps.clear();
-
-    for (auto& pair : m_HDRTextures)
-    {
-        glDeleteTextures(1, &pair.second);
-    }
-    m_HDRTextures.clear();
-
-    for (auto& pair : m_HDRSkyboxes)
-    {
-        glDeleteTextures(1, &pair.second);
-    }
-    m_HDRSkyboxes.clear();
-
-    for (auto& pair : m_IrradianceMaps)
-    {
-        glDeleteTextures(1, &pair.second);
-    }
-    m_IrradianceMaps.clear();
-
-    for (auto& pair : m_PrefilterMaps)
-    {
-        glDeleteTextures(1, &pair.second);
-    }
-    m_PrefilterMaps.clear();
+    ClearMapResources();
 
     if (m_BRDFLUT != 0)
     {

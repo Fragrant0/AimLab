@@ -29,7 +29,8 @@ public:
                 const ShadowMapper* shadowMapper,
                 bool iblEnabled,
                 bool pcssEnabled,
-                float shadowBias);
+                float shadowBias,
+                float skyboxRotation);
 
     void RenderDepth(const MapConfig& map,
                      const ModelMap& models,

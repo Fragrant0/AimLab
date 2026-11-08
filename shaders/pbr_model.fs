@@ -28,6 +28,7 @@ uniform float u_Roughness;
 uniform float u_AO;
 uniform float u_IBLDiffuseIntensity;
 uniform float u_IBLSpecularIntensity;
+uniform float u_EnvironmentRotation;
 uniform float u_ModelBrightness;
 uniform float u_ModelAmbientIntensity;
 uniform vec3 u_ModelAmbientColor;
@@ -73,6 +74,16 @@ vec2 poissonDisk[16] = vec2[](
     vec2(-0.24188840, 0.99706507), vec2(-0.81409955, 0.91437590),
     vec2(0.19984126, 0.78641367), vec2(0.14383161, -0.14100790)
 );
+
+vec3 ToEnvironmentSpace(vec3 worldDirection)
+{
+    // Match skybox.vs: sampling uses the inverse world-environment rotation.
+    float c = cos(u_EnvironmentRotation);
+    float s = sin(u_EnvironmentRotation);
+    return vec3(c * worldDirection.x - s * worldDirection.z,
+                worldDirection.y,
+                s * worldDirection.x + c * worldDirection.z);
+}
 
 float DistributionGGX(vec3 N, vec3 H, float roughness)
 {
@@ -237,12 +248,12 @@ void main()
     vec3 kS = F;
     vec3 kD = (vec3(1.0) - kS) * (1.0 - metallic);
 
-    vec3 irradiance = texture(irradianceMap, N).rgb;
+    vec3 irradiance = texture(irradianceMap, ToEnvironmentSpace(N)).rgb;
     vec3 diffuseIBL = irradiance * albedo * u_IBLDiffuseIntensity;
 
     vec3 R = reflect(-V, N);
     const float MAX_REFLECTION_LOD = 4.0;
-    vec3 prefilteredColor = textureLod(prefilterMap, R, roughness * MAX_REFLECTION_LOD).rgb;
+    vec3 prefilteredColor = textureLod(prefilterMap, ToEnvironmentSpace(R), roughness * MAX_REFLECTION_LOD).rgb;
     vec2 brdf = texture(brdfLUT, vec2(NdotV, roughness)).rg;
     vec3 specularIBL = prefilteredColor * (F * brdf.x + brdf.y) * u_IBLSpecularIntensity;
 

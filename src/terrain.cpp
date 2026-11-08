@@ -4,6 +4,8 @@
 #include <cfloat>
 #include <cmath>
 #include <iostream>
+#include <memory>
+#include <stdexcept>
 
 Terrain::Terrain()
     : m_VAO(0), m_VBO(0), m_EBO(0), m_IndexCount(0),
@@ -23,6 +25,13 @@ bool Terrain::GenerateFromHeightmap(const std::string& heightmapPath, float heig
 {
     Cleanup();
 
+    if (gridSize < 1 || gridSize > 2048 || !std::isfinite(size) || size <= 0.0f ||
+        !std::isfinite(heightScale))
+    {
+        std::cerr << "[Terrain] Invalid heightmap dimensions or scale: " << heightmapPath << std::endl;
+        return false;
+    }
+
     m_HeightScale = heightScale;
     m_GridSize = gridSize;
     m_Size = size;
@@ -34,7 +43,9 @@ bool Terrain::GenerateFromHeightmap(const std::string& heightmapPath, float heig
     const bool is16BitHeightmap = stbi_is_16_bit(heightmapPath.c_str()) != 0;
     if (is16BitHeightmap)
     {
-        stbi_us* data16 = stbi_load_16(heightmapPath.c_str(), &width, &height, &channels, 1);
+        std::unique_ptr<stbi_us, decltype(&stbi_image_free)> image(
+            stbi_load_16(heightmapPath.c_str(), &width, &height, &channels, 1), stbi_image_free);
+        const stbi_us* data16 = image.get();
         if (!data16)
         {
             std::cout << "Failed to load 16-bit heightmap: " << heightmapPath << std::endl;
@@ -47,11 +58,12 @@ bool Terrain::GenerateFromHeightmap(const std::string& heightmapPath, float heig
         {
             m_HeightData[i] = static_cast<float>(data16[i]) * kInv16BitRange;
         }
-        stbi_image_free(data16);
     }
     else
     {
-        unsigned char* data8 = stbi_load(heightmapPath.c_str(), &width, &height, &channels, 1);
+        std::unique_ptr<unsigned char, decltype(&stbi_image_free)> image(
+            stbi_load(heightmapPath.c_str(), &width, &height, &channels, 1), stbi_image_free);
+        const unsigned char* data8 = image.get();
         if (!data8)
         {
             std::cout << "Failed to load heightmap: " << heightmapPath << std::endl;
@@ -64,7 +76,6 @@ bool Terrain::GenerateFromHeightmap(const std::string& heightmapPath, float heig
         {
             m_HeightData[i] = static_cast<float>(data8[i]) * kInv8BitRange;
         }
-        stbi_image_free(data8);
     }
 
     m_HeightmapWidth = width;
@@ -364,16 +375,28 @@ void Terrain::UploadToGPU()
     glGenVertexArrays(1, &m_VAO);
     glGenBuffers(1, &m_VBO);
     glGenBuffers(1, &m_EBO);
+    if (!m_VAO || !m_VBO || !m_EBO)
+        throw std::runtime_error("[Terrain] Could not allocate mesh objects.");
 
     glBindVertexArray(m_VAO);
 
 
     glBindBuffer(GL_ARRAY_BUFFER, m_VBO);
     glBufferData(GL_ARRAY_BUFFER, m_Vertices.size() * sizeof(TerrainVertex), m_Vertices.data(), GL_STATIC_DRAW);
+    GLint64 vertexBytes = 0;
+    glGetBufferParameteri64v(GL_ARRAY_BUFFER, GL_BUFFER_SIZE, &vertexBytes);
 
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_EBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_Indices.size() * sizeof(unsigned int), m_Indices.data(), GL_STATIC_DRAW);
+    GLint64 indexBytes = 0;
+    glGetBufferParameteri64v(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &indexBytes);
+    if (vertexBytes != static_cast<GLint64>(m_Vertices.size() * sizeof(TerrainVertex)) ||
+        indexBytes != static_cast<GLint64>(m_Indices.size() * sizeof(unsigned int)))
+    {
+        glBindVertexArray(0);
+        throw std::runtime_error("[Terrain] Could not allocate mesh storage.");
+    }
 
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(TerrainVertex), (void*)offsetof(TerrainVertex, Position));

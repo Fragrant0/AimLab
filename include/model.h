@@ -26,6 +26,8 @@
 #include <cstring>
 #include <filesystem>
 #include <limits>
+#include <memory>
+#include <stdexcept>
 using namespace std;
 
 inline unsigned int TextureFromFile(const char* path, const string& directory, bool gamma = false);
@@ -48,7 +50,22 @@ public:
           BoundsMin(glm::vec3(std::numeric_limits<float>::max())),
           BoundsMax(glm::vec3(std::numeric_limits<float>::lowest()))
     {
-        loadModel(path);
+        try
+        {
+            loadModel(path);
+        }
+        catch (const std::exception& error)
+        {
+            meshes.clear();
+            ReleaseTextures();
+            throw std::runtime_error("[Model] Failed to load '" + path + "': " + error.what());
+        }
+        catch (...)
+        {
+            meshes.clear();
+            ReleaseTextures();
+            throw;
+        }
     }
 
     Model(const Model&) = delete;
@@ -58,18 +75,7 @@ public:
 
     ~Model()
     {
-        // Aliased material entries must not delete the same GL handle twice.
-        for (auto it = textures_loaded.begin(); it != textures_loaded.end(); ++it)
-        {
-            const unsigned int textureId = it->id;
-            if (textureId == 0)
-                continue;
-
-            const bool alreadyReleased = std::any_of(textures_loaded.begin(), it,
-                [textureId](const Texture& texture) { return texture.id == textureId; });
-            if (!alreadyReleased)
-                glDeleteTextures(1, &textureId);
-        }
+        ReleaseTextures();
     }
 
     // draws the model, and thus all its meshes
@@ -90,6 +96,22 @@ public:
     glm::vec3 GetBoundsSize() const { return BoundsMax - BoundsMin; }
 
 private:
+    void ReleaseTextures() noexcept
+    {
+        // Aliased material entries must not delete the same GL handle twice.
+        for (auto it = textures_loaded.begin(); it != textures_loaded.end(); ++it)
+        {
+            const unsigned int textureId = it->id;
+            if (textureId == 0)
+                continue;
+            const bool alreadyReleased = std::any_of(textures_loaded.begin(), it,
+                [textureId](const Texture& texture) { return texture.id == textureId; });
+            if (!alreadyReleased)
+                glDeleteTextures(1, &textureId);
+        }
+        textures_loaded.clear();
+    }
+
     // loads a model with supported ASSIMP extensions from file and stores the resulting meshes in the meshes vector.
     void loadModel(string const& path)
     {
@@ -99,8 +121,7 @@ private:
         // check for errors
         if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) // if is Not Zero
         {
-            cout << "ERROR::ASSIMP:: " << importer.GetErrorString() << endl;
-            return;
+            throw std::runtime_error("Assimp import failed for '" + path + "': " + importer.GetErrorString());
         }
         // retrieve the directory path of the filepath
         std::filesystem::path modelPath(path);
@@ -108,6 +129,8 @@ private:
 
         // process ASSIMP's root node recursively
         processNode(scene->mRootNode, scene, glm::mat4(1.0f));
+        if (meshes.empty())
+            throw std::runtime_error("No renderable meshes in '" + path + "'.");
 
         glm::vec3 size = GetBoundsSize();
         std::cout << "[Model] Loaded " << path << " | meshes: " << meshes.size()
@@ -149,6 +172,9 @@ private:
 
     Mesh processMesh(aiMesh* mesh, const aiScene* scene, const glm::mat4& transform)
     {
+        if (!mesh || !mesh->mVertices || mesh->mNumVertices == 0 || mesh->mNumFaces == 0 ||
+            mesh->mMaterialIndex >= scene->mNumMaterials)
+            throw std::runtime_error("Invalid or empty mesh in '" + directory + "'.");
         // data to fill
         vector<Vertex> vertices;
         vector<unsigned int> indices;
@@ -228,6 +254,8 @@ private:
             for (unsigned int j = 0; j < face.mNumIndices; j++)
                 indices.push_back(face.mIndices[j]);
         }
+        if (indices.empty())
+            throw std::runtime_error("Mesh has no indices in '" + directory + "'.");
         // process materials
         aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
         // we assume a convention for sampler names in the shaders. Each diffuse texture should be named
@@ -292,7 +320,8 @@ private:
         for (unsigned int i = 0; i < mat->GetTextureCount(type); i++)
         {
             aiString str;
-            mat->GetTexture(type, i, &str);
+            if (mat->GetTexture(type, i, &str) != AI_SUCCESS)
+                throw std::runtime_error("Cannot read material texture reference in '" + directory + "'.");
             // check if texture was loaded before and if so, continue to next iteration: skip loading a new texture
             bool skip = false;
             for (unsigned int j = 0; j < textures_loaded.size(); j++)
@@ -308,14 +337,19 @@ private:
             if (!skip)
             {   // if texture hasn't been loaded already, load it
                 Texture texture;
-                texture.id = TextureFromFile(str.C_Str(), this->directory, srgb);
                 texture.type = ResolveTextureType(typeName, str.C_Str());
                 texture.path = str.C_Str();
-                if (texture.id != 0)
+                texture.id = TextureFromFile(str.C_Str(), this->directory, srgb);
+                try
                 {
-                    textures.push_back(texture);
-                    textures_loaded.push_back(texture);  // store it as texture loaded for entire model, to ensure we won't unnecessary load duplicate textures.
+                    textures_loaded.push_back(texture);
                 }
+                catch (...)
+                {
+                    glDeleteTextures(1, &texture.id);
+                    throw;
+                }
+                textures.push_back(texture);
             }
         }
         return textures;
@@ -350,14 +384,19 @@ private:
         }
 
         Texture texture;
-        texture.id = TextureFromFile(filePath.filename().string().c_str(), this->directory, srgb);
         texture.type = typeName;
         texture.path = pathString;
-        if (texture.id != 0)
+        texture.id = TextureFromFile(filePath.filename().string().c_str(), this->directory, srgb);
+        try
         {
-            textures.push_back(texture);
             textures_loaded.push_back(texture);
         }
+        catch (...)
+        {
+            glDeleteTextures(1, &texture.id);
+            throw;
+        }
+        textures.push_back(texture);
     }
 
     void AddLocalPBRTextureFallbacks(vector<Texture>& textures)
@@ -422,15 +461,15 @@ unsigned int TextureFromFile(const char* path, const string& directory, bool gam
 {
     namespace fs = std::filesystem;
 
+    if (!path || !*path)
+        throw std::runtime_error("[Model] Empty texture path in '" + directory + "'.");
     string requestedPath = string(path);
-    string filename = directory + '/' + requestedPath;
+    string filename = (fs::path(directory) / requestedPath).generic_string();
     string loadedFilename = filename;
 
-    unsigned int textureID;
-    glGenTextures(1, &textureID);
-
-    int width, height, nrComponents;
-    unsigned char* data = stbi_load(filename.c_str(), &width, &height, &nrComponents, 0);
+    int width = 0, height = 0, nrComponents = 0;
+    std::unique_ptr<unsigned char, decltype(&stbi_image_free)> data(
+        stbi_load(filename.c_str(), &width, &height, &nrComponents, 0), stbi_image_free);
 
     if (!data)
     {
@@ -448,7 +487,7 @@ unsigned int TextureFromFile(const char* path, const string& directory, bool gam
             if (candidate.generic_string() == filename)
                 continue;
 
-            data = stbi_load(candidate.generic_string().c_str(), &width, &height, &nrComponents, 0);
+            data.reset(stbi_load(candidate.generic_string().c_str(), &width, &height, &nrComponents, 0));
             if (data)
             {
                 loadedFilename = candidate.generic_string();
@@ -468,7 +507,7 @@ unsigned int TextureFromFile(const char* path, const string& directory, bool gam
                 if (candidate.stem().string() != stem)
                     continue;
 
-                data = stbi_load(candidate.generic_string().c_str(), &width, &height, &nrComponents, 0);
+                data.reset(stbi_load(candidate.generic_string().c_str(), &width, &height, &nrComponents, 0));
                 if (data)
                 {
                     loadedFilename = candidate.generic_string();
@@ -479,53 +518,83 @@ unsigned int TextureFromFile(const char* path, const string& directory, bool gam
         }
     }
 
-    if (data)
+    if (!data)
     {
-        GLenum format;
-        GLenum internalFormat;
+        const char* reason = stbi_failure_reason();
+        throw std::runtime_error("[Model] Failed to load texture '" + filename + "': " +
+            (reason ? reason : "unknown decoder error"));
+    }
+
+    GLint maxTextureSize = 0;
+    glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxTextureSize);
+    if (width <= 0 || height <= 0 || width > maxTextureSize || height > maxTextureSize ||
+        nrComponents < 1 || nrComponents > 4)
+        throw std::runtime_error("[Model] Invalid texture dimensions or channels: " + loadedFilename);
+
+    struct UploadState
+    {
+        UploadState()
+        {
+            glGetIntegerv(GL_TEXTURE_BINDING_2D, &Texture);
+            glGetIntegerv(GL_UNPACK_ALIGNMENT, &Alignment);
+        }
+        ~UploadState()
+        {
+            glBindTexture(GL_TEXTURE_2D, Texture);
+            glPixelStorei(GL_UNPACK_ALIGNMENT, Alignment);
+        }
+        GLint Texture = 0;
+        GLint Alignment = 4;
+    } state;
+    struct TextureOwner
+    {
+        ~TextureOwner() { if (ID) glDeleteTextures(1, &ID); }
+        unsigned int ID = 0;
+    } texture;
+    glGenTextures(1, &texture.ID);
+    if (!texture.ID)
+        throw std::runtime_error("[Model] Failed to allocate texture: " + loadedFilename);
+
+    GLenum format = GL_RGB;
+    GLenum internalFormat = gamma ? GL_SRGB : GL_RGB;
+    if (nrComponents == 1)
+    {
+        format = GL_RED;
+        internalFormat = GL_RED;
+    }
+    else if (nrComponents == 2)
+    {
+        format = GL_RG;
+        internalFormat = GL_RG;
+    }
+    else if (nrComponents == 3)
+    {
         format = GL_RGB;
         internalFormat = gamma ? GL_SRGB : GL_RGB;
-        if (nrComponents == 1)
-        {
-            format = GL_RED;
-            internalFormat = GL_RED;
-        }
-        else if (nrComponents == 2)
-        {
-            format = GL_RG;
-            internalFormat = GL_RG;
-        }
-        else if (nrComponents == 3)
-        {
-            format = GL_RGB;
-            internalFormat = gamma ? GL_SRGB : GL_RGB;
-        }
-        else if (nrComponents == 4)
-        {
-            format = GL_RGBA;
-            internalFormat = gamma ? GL_SRGB_ALPHA : GL_RGBA;
-        }
-
-        glBindTexture(GL_TEXTURE_2D, textureID);
-        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-        glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, format, GL_UNSIGNED_BYTE, data);
-        glGenerateMipmap(GL_TEXTURE_2D);
-
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-        stbi_image_free(data);
     }
-    else
+    else if (nrComponents == 4)
     {
-        std::cout << "Texture failed to load at path: " << path << std::endl;
-        stbi_image_free(data);
-        glDeleteTextures(1, &textureID);
-        return 0;
+        format = GL_RGBA;
+        internalFormat = gamma ? GL_SRGB_ALPHA : GL_RGBA;
     }
 
+    glBindTexture(GL_TEXTURE_2D, texture.ID);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, format, GL_UNSIGNED_BYTE, data.get());
+    GLint actualWidth = 0, actualHeight = 0;
+    glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &actualWidth);
+    glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &actualHeight);
+    if (actualWidth != width || actualHeight != height)
+        throw std::runtime_error("[Model] Failed to allocate texture storage: " + loadedFilename);
+    glGenerateMipmap(GL_TEXTURE_2D);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    const unsigned int textureID = texture.ID;
+    texture.ID = 0;
     return textureID;
 }
 #endif

@@ -51,7 +51,7 @@ AimLab 是一个将**实时渲染实验与第一人称瞄准交互**结合的个
 
 </details>
 
-以上图片均为程序固定视角下的实机截图，使用自由相机隐藏武器和普通 HUD。场景中的模型、纹理和环境图包含第三方素材。
+以上图片均为程序固定视角下的 1600 × 900 实机截图，开启 IBL 与 PCSS 风格软阴影，使用自由相机隐藏武器和普通 HUD。场景中的模型、纹理和环境图包含第三方素材。
 
 ## 技术亮点
 
@@ -141,7 +141,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\smoke_build_run.ps
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\check_startup_failures.ps1
 ```
 
-该检查在 `tmp/` 的独立副本中测试缺失 shader、GLSL 编译与链接错误，以及 IBL、字体和后处理的晚期失败。故障必须返回退出码 `1` 并报告对应阶段；原始资源不会修改。
+该检查在 `tmp/` 的独立副本中验证正常基线和 27 种配置、资源或 shader 故障，包括 GLSL 编译/链接及 IBL、字体、后处理晚期失败。故障必须返回退出码 `1` 并报告对应阶段；原始资源不会修改。
+
+地图加载与回退的 OpenGL 集成检查使用独立测试工程，不加入主解决方案：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\check_map_loading.ps1
+```
+
+脚本沿用上述依赖路径配置，构建 `tests/map_loading_tests.vcxproj`，验证资源损坏后旧场景仍可渲染、候选资源被释放，以及失败后仍能正常切图。临时场景和日志保存在 `tmp/`。
 
 <details>
 <summary><strong>复现固定视角截图</strong></summary>
@@ -189,16 +197,17 @@ AimLab/
 │   ├── textures/             # 地表、heightmap 与 HDR 环境图
 │   └── fonts/                # HUD 字体
 ├── scripts/                  # 构建、启动检查与程序化资源生成
+├── tests/                    # 独立 OpenGL 地图加载与回退测试
 ├── docs/                     # 实机截图与实现说明
 └── opengl_try.sln            # Visual Studio 解决方案
 ```
 
 ## 当前边界与后续方向
 
-- 地图切换为**同步加载**，会重新加载资源并计算 IBL；尚未实现后台流式加载或 JSON 文件热重载。
+- 地图切换为**同步加载**；候选场景准备成功后才提交，失败保留旧场景。准备阶段同时持有新旧资源，仍需优化停顿与显存峰值；尚未实现后台加载或 JSON 文件热重载。
 - 粒子采用 **CPU 模拟 + GPU 实例化绘制**，当前容量为 2,000；后续补齐规模测试与 CPU / GPU 帧时基准。
 - 射击检测针对靶球，尚未加入完整的地形与场景模型遮挡检测。
-- 软阴影使用经验半影近似；稳定阴影投影、天空盒旋转与 IBL 方向同步、全场景颜色空间一致性仍有改进空间。
+- 软阴影使用经验半影近似；阴影投影稳定性与全场景颜色空间一致性仍有改进空间。PBR 的 IBL 采样方向已与天空盒旋转同步。
 - Bloom 提取与模糊 shader 尚未接入当前渲染管线；后续计划补齐合成与可复现的效果对比。
 
 欢迎通过 issue 讨论渲染问题或复现情况。贡献约定见 [Repository Guidelines](AGENTS.md)。

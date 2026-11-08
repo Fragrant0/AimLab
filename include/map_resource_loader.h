@@ -14,7 +14,6 @@ public:
     using ModelMap = std::map<std::string, std::unique_ptr<Model>>;
 
     void Load(const MapConfig& map, ModelMap& propModels);
-    void Unload(const MapConfig& map, ModelMap& propModels);
 };
 
 #endif

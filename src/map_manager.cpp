@@ -3,24 +3,129 @@
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <fstream>
 #include <iostream>
+#include <limits>
+#include <stdexcept>
+#include <utility>
 
 using json = nlohmann::json;
 
 namespace
 {
-    glm::vec3 ReadVec3(const json& value, const glm::vec3& fallback)
+    [[noreturn]] void InvalidField(const std::string& field, const std::string& reason)
     {
-        if (!value.is_array() || value.size() < 3)
-            return fallback;
-        return glm::vec3(value[0].get<float>(), value[1].get<float>(), value[2].get<float>());
+        throw std::runtime_error("[MapManager] " + field + ": " + reason);
     }
 
-    void SyncLegacyAmbient(MapConfig& map)
+    std::string FieldPath(const std::string& context, const char* key)
     {
-        map.Lighting.AmbientColor = map.AmbientColor;
-        map.Lighting.AmbientIntensity = map.AmbientIntensity;
+        return context + "." + key;
+    }
+
+    float ReadNumber(const json& value, const std::string& field)
+    {
+        if (!value.is_number())
+            InvalidField(field, "expected a finite number.");
+
+        const double number = value.get<double>();
+        if (!std::isfinite(number) || number < std::numeric_limits<float>::lowest() ||
+            number > std::numeric_limits<float>::max())
+            InvalidField(field, "expected a finite number representable as float.");
+        return static_cast<float>(number);
+    }
+
+    float ReadFloat(const json& object, const char* key, float fallback, const std::string& context)
+    {
+        const auto value = object.find(key);
+        return value == object.end() ? fallback : ReadNumber(*value, FieldPath(context, key));
+    }
+
+    float ReadNonNegative(const json& object, const char* key, float fallback, const std::string& context)
+    {
+        const float value = ReadFloat(object, key, fallback, context);
+        if (value < 0.0f)
+            InvalidField(FieldPath(context, key), "must be non-negative.");
+        return value;
+    }
+
+    float ReadPositive(const json& object, const char* key, float fallback, const std::string& context)
+    {
+        const float value = ReadFloat(object, key, fallback, context);
+        if (value <= 0.0f)
+            InvalidField(FieldPath(context, key), "must be greater than zero.");
+        return value;
+    }
+
+    std::string ReadString(const json& object, const char* key, const std::string& fallback,
+                           const std::string& context, bool requireNonEmpty = false)
+    {
+        const auto value = object.find(key);
+        if (value != object.end() && !value->is_string())
+            InvalidField(FieldPath(context, key), "expected a string.");
+        const std::string result = value == object.end() ? fallback : value->get<std::string>();
+        if (result.find('\0') != std::string::npos)
+            InvalidField(FieldPath(context, key), "must not contain an embedded null character.");
+        if (requireNonEmpty && result.find_first_not_of(" \t\r\n") == std::string::npos)
+            InvalidField(FieldPath(context, key), "must be a non-empty string.");
+        return result;
+    }
+
+    bool ReadBool(const json& object, const char* key, bool fallback, const std::string& context)
+    {
+        const auto value = object.find(key);
+        if (value == object.end())
+            return fallback;
+        if (!value->is_boolean())
+            InvalidField(FieldPath(context, key), "expected a boolean.");
+        return value->get<bool>();
+    }
+
+    const json& ReadObject(const json& object, const char* key, const std::string& context)
+    {
+        static const json emptyObject = json::object();
+        const auto value = object.find(key);
+        if (value == object.end())
+            return emptyObject;
+        if (!value->is_object())
+            InvalidField(FieldPath(context, key), "expected an object.");
+        return *value;
+    }
+
+    const json& ReadArray(const json& object, const char* key, const std::string& context)
+    {
+        static const json emptyArray = json::array();
+        const auto value = object.find(key);
+        if (value == object.end())
+            return emptyArray;
+        if (!value->is_array())
+            InvalidField(FieldPath(context, key), "expected an array.");
+        return *value;
+    }
+
+    glm::vec3 ReadVec3(const json& object, const char* key, const glm::vec3& fallback,
+                       const std::string& context)
+    {
+        const auto value = object.find(key);
+        if (value == object.end())
+            return fallback;
+        const std::string field = FieldPath(context, key);
+        if (!value->is_array() || value->size() != 3)
+            InvalidField(field, "expected an array of exactly three numbers.");
+        glm::vec3 result;
+        for (int component = 0; component < 3; ++component)
+            result[component] = ReadNumber((*value)[component], field + "[" + std::to_string(component) + "]");
+        return result;
+    }
+
+    glm::vec3 ReadColor(const json& object, const char* key, const glm::vec3& fallback,
+                        const std::string& context)
+    {
+        const glm::vec3 color = ReadVec3(object, key, fallback, context);
+        if (color.x < 0.0f || color.y < 0.0f || color.z < 0.0f)
+            InvalidField(FieldPath(context, key), "color components must be non-negative.");
+        return color;
     }
 }
 
@@ -29,18 +134,12 @@ MapManager::MapManager()
 {
 }
 
-MapManager::~MapManager()
-{
-}
+MapManager::~MapManager() = default;
 
 void MapManager::Initialize()
 {
     LoadMapsFromJson("resources/maps_config.json");
-    if (m_Maps.empty())
-    {
-        SetupDefaultMaps();
-    }
-    m_CurrentMapIndex = m_Maps.empty() ? 0 : std::min(1, static_cast<int>(m_Maps.size()) - 1);
+    m_CurrentMapIndex = std::min(1, static_cast<int>(m_Maps.size()) - 1);
 }
 
 int MapManager::GetCurrentMapIndex() const
@@ -50,26 +149,17 @@ int MapManager::GetCurrentMapIndex() const
 
 const MapConfig& MapManager::GetCurrentMap() const
 {
-    if (m_Maps.empty())
-    {
-        static MapConfig defaultMap;
-        return defaultMap;
-    }
-    if (m_CurrentMapIndex < 0 || m_CurrentMapIndex >= static_cast<int>(m_Maps.size()))
-        return m_Maps[0];
-    return m_Maps[m_CurrentMapIndex];
+    return GetMap(m_CurrentMapIndex);
 }
 
 const MapConfig& MapManager::GetMap(int index) const
 {
     if (m_Maps.empty())
-    {
-        static MapConfig defaultMap;
-        return defaultMap;
-    }
-    if (index >= 0 && index < static_cast<int>(m_Maps.size()))
-        return m_Maps[index];
-    return m_Maps[0];
+        throw std::runtime_error("[MapManager] No maps have been loaded.");
+    if (index < 0 || index >= static_cast<int>(m_Maps.size()))
+        throw std::out_of_range("[MapManager] Map index " + std::to_string(index) +
+                                " is outside [0, " + std::to_string(m_Maps.size()) + ").");
+    return m_Maps[index];
 }
 
 int MapManager::GetMapCount() const
@@ -79,8 +169,8 @@ int MapManager::GetMapCount() const
 
 void MapManager::SwitchToMap(int index)
 {
-    if (index >= 0 && index < static_cast<int>(m_Maps.size()))
-        m_CurrentMapIndex = index;
+    GetMap(index);
+    m_CurrentMapIndex = index;
 }
 
 const std::string& MapManager::GetCurrentFloorTextureName() const
@@ -123,303 +213,189 @@ void MapManager::LoadMapsFromJson(const std::string& path)
 {
     std::ifstream file(path);
     if (!file.is_open())
-    {
-        std::cout << "[MapManager] JSON config not found: " << path << ", using defaults." << std::endl;
-        return;
-    }
+        throw std::runtime_error("[MapManager] Could not open JSON config: " + path);
 
+    json document;
     try
     {
-        json j;
-        file >> j;
+        document = json::parse(file);
+    }
+    catch (const json::exception& error)
+    {
+        throw std::runtime_error("[MapManager] Could not parse JSON config " + path + ": " + error.what());
+    }
+    if (file.bad())
+        throw std::runtime_error("[MapManager] Could not read JSON config: " + path);
+    if (!document.is_object())
+        InvalidField(path, "expected an object containing a non-empty maps array.");
 
-        for (const auto& jMap : j["maps"])
+    const json& maps = ReadArray(document, "maps", path);
+    if (maps.empty() || maps.size() > static_cast<size_t>(std::numeric_limits<int>::max()))
+        InvalidField(path + ".maps", "expected a non-empty maps array with a representable map count.");
+
+    std::vector<MapConfig> parsedMaps;
+    parsedMaps.reserve(maps.size());
+    for (size_t index = 0; index < maps.size(); ++index)
+    {
+        const json& jMap = maps[index];
+        const std::string context = path + " maps[" + std::to_string(index) + "]";
+        if (!jMap.is_object())
+            InvalidField(context, "expected a map object.");
+
+        MapConfig map;
+        map.Name = ReadString(jMap, "name", "Unnamed", context, true);
+        const std::string skyboxType = ReadString(jMap, "skybox_type", "cubemap", context);
+        map.Skybox.HDRPath = ReadString(jMap, "skybox_hdr", "", context);
+        const json& faces = ReadArray(jMap, "skybox_faces", context);
+        if (jMap.contains("skybox_faces") && faces.size() != 6)
+            InvalidField(context + ".skybox_faces", "a cubemap requires exactly six face paths.");
+        for (size_t faceIndex = 0; faceIndex < faces.size(); ++faceIndex)
         {
-            MapConfig map;
-            map.Name = jMap.value("name", "Unnamed");
-
-            std::string skyboxType = jMap.value("skybox_type", "cubemap");
-            if (skyboxType == "hdr")
-            {
-                map.Skybox.Type = SkyboxType::HDR;
-                map.Skybox.HDRPath = jMap.value("skybox_hdr", "");
-            }
-            else
-            {
-                map.Skybox.Type = SkyboxType::Cubemap;
-                if (jMap.contains("skybox_faces"))
-                {
-                    for (const auto& face : jMap["skybox_faces"])
-                        map.Skybox.Faces.push_back(face.get<std::string>());
-                }
-            }
-
-            map.FloorTexturePath = jMap.value("floor_texture", "");
-            map.FloorTextureName = jMap.value("floor_texture_name", "floor_" + map.Name);
-
-            if (jMap.contains("ambient_color"))
-                map.AmbientColor = ReadVec3(jMap["ambient_color"], map.AmbientColor);
-            map.AmbientIntensity = jMap.value("ambient_intensity", 1.0f);
-            SyncLegacyAmbient(map);
-
-            if (jMap.contains("lighting"))
-            {
-                const auto& jLighting = jMap["lighting"];
-                if (jLighting.contains("main_light"))
-                {
-                    const auto& jMain = jLighting["main_light"];
-                    map.Lighting.MainLight.Direction =
-                        glm::normalize(ReadVec3(jMain.value("direction", json::array({-0.35f, -0.9f, -0.25f})),
-                                                map.Lighting.MainLight.Direction));
-                    map.Lighting.MainLight.Color =
-                        ReadVec3(jMain.value("color", json::array({1.0f, 0.94f, 0.84f})),
-                                 map.Lighting.MainLight.Color);
-                    map.Lighting.MainLight.Intensity = jMain.value("intensity", map.Lighting.MainLight.Intensity);
-                    map.Lighting.MainLight.SyncWithSkyboxRotation =
-                        jMain.value("sync_with_skybox_rotation", map.Lighting.MainLight.SyncWithSkyboxRotation);
-                    map.Lighting.MainLight.SkyboxRotationOffset =
-                        jMain.value("skybox_rotation_offset", map.Lighting.MainLight.SkyboxRotationOffset);
-                    map.Lighting.MainLight.AngularSize = jMain.value("angular_size", map.Lighting.MainLight.AngularSize);
-                }
-
-                if (jLighting.contains("ambient"))
-                {
-                    const auto& jAmbient = jLighting["ambient"];
-                    if (jAmbient.contains("ambient_color"))
-                        map.Lighting.AmbientColor = ReadVec3(jAmbient["ambient_color"], map.Lighting.AmbientColor);
-                    map.Lighting.AmbientIntensity = jAmbient.value("ambient_intensity", map.Lighting.AmbientIntensity);
-                    map.Lighting.IBLDiffuseIntensity =
-                        jAmbient.value("ibl_diffuse_intensity", map.Lighting.IBLDiffuseIntensity);
-                    map.Lighting.IBLSpecularIntensity =
-                        jAmbient.value("ibl_specular_intensity", map.Lighting.IBLSpecularIntensity);
-                }
-
-                if (jLighting.contains("point_lights"))
-                {
-                    for (const auto& jPoint : jLighting["point_lights"])
-                    {
-                        PointLightConfig point;
-                        point.Position = ReadVec3(jPoint.value("position", json::array({0.0f, 0.0f, 0.0f})),
-                                                  point.Position);
-                        point.Color = ReadVec3(jPoint.value("color", json::array({1.0f, 1.0f, 1.0f})),
-                                               point.Color);
-                        point.Intensity = jPoint.value("intensity", point.Intensity);
-                        point.Range = jPoint.value("range", point.Range);
-                        map.Lighting.PointLights.push_back(point);
-                    }
-                }
-            }
-
-            if (jMap.contains("post_process"))
-            {
-                const auto& jPost = jMap["post_process"];
-                map.PostProcess.Exposure = jPost.value("exposure", map.PostProcess.Exposure);
-                map.PostProcess.Gamma = jPost.value("gamma", map.PostProcess.Gamma);
-                map.PostProcess.Contrast = jPost.value("contrast", map.PostProcess.Contrast);
-                map.PostProcess.Saturation = jPost.value("saturation", map.PostProcess.Saturation);
-                map.PostProcess.Vignette = jPost.value("vignette", map.PostProcess.Vignette);
-                map.PostProcess.PixelateEnabled = jPost.value("pixelate_enabled", map.PostProcess.PixelateEnabled);
-                map.PostProcess.PixelSize = jPost.value("pixel_size", map.PostProcess.PixelSize);
-                map.PostProcess.UnderwaterEnabled = jPost.value("underwater_enabled", map.PostProcess.UnderwaterEnabled);
-            }
-
-            map.SpawnRadius = jMap.value("spawn_radius", 15.0f);
-
-            std::string terrainType = jMap.value("terrain", "flat");
-            map.Terrain = (terrainType == "heightmap") ? TerrainType::Heightmap : TerrainType::Flat;
-            map.EcologyEnabled = jMap.value("ecology_enabled", map.Terrain == TerrainType::Heightmap && map.Name == "Nature");
-
-            if (jMap.contains("heightmap"))
-            {
-                const auto& jHm = jMap["heightmap"];
-                map.Heightmap.Path = jHm.value("path", "");
-                map.Heightmap.HeightScale = jHm.value("height_scale", 5.0f);
-                map.Heightmap.GridSize = jHm.value("grid_size", 100);
-                map.Heightmap.Size = jHm.value("size", 20.0f);
-            }
-
-            if (jMap.contains("props"))
-            {
-                for (const auto& jProp : jMap["props"])
-                {
-                    PropConfig prop;
-                    prop.ModelPath = jProp.value("model", "");
-                    if (jProp.contains("position"))
-                        prop.Position = ReadVec3(jProp["position"], prop.Position);
-                    if (jProp.contains("rotation"))
-                        prop.Rotation = ReadVec3(jProp["rotation"], prop.Rotation);
-                    if (jProp.contains("scale"))
-                    {
-                        const auto& s = jProp["scale"];
-                        if (s.is_number())
-                            prop.Scale = glm::vec3(s.get<float>());
-                        else
-                            prop.Scale = ReadVec3(s, prop.Scale);
-                    }
-                    prop.TargetHeight = jProp.value("target_height", prop.TargetHeight);
-                    prop.PBRBrightness = jProp.value("pbr_brightness", prop.PBRBrightness);
-                    prop.PBRAmbientIntensity = jProp.value("pbr_ambient_intensity", prop.PBRAmbientIntensity);
-                    if (jProp.contains("pbr_ambient_color"))
-                        prop.PBRAmbientColor = ReadVec3(jProp["pbr_ambient_color"], prop.PBRAmbientColor);
-                    map.Props.push_back(prop);
-                }
-            }
-
-            if (jMap.contains("player_start"))
-                map.PlayerStartPos = ReadVec3(jMap["player_start"], map.PlayerStartPos);
-
-            if (jMap.contains("target_area"))
-            {
-                const auto& jTa = jMap["target_area"];
-                map.TargetArea.WallDistance = jTa.value("wall_distance", 15.0f);
-                map.TargetArea.WallWidth = jTa.value("wall_width", 12.0f);
-                map.TargetArea.WallHeight = jTa.value("wall_height", 8.0f);
-                map.TargetArea.WallCenterY = jTa.value("wall_center_y", 2.5f);
-                map.TargetArea.Lifetime = jTa.value("lifetime", 5.0f);
-            }
-
-            m_Maps.push_back(map);
+            const std::string faceContext = context + ".skybox_faces[" + std::to_string(faceIndex) + "]";
+            if (!faces[faceIndex].is_string())
+                InvalidField(faceContext, "expected a non-empty face path string.");
+            const std::string face = faces[faceIndex].get<std::string>();
+            if (face.find_first_not_of(" \t\r\n") == std::string::npos || face.find('\0') != std::string::npos)
+                InvalidField(faceContext, "expected a non-empty face path without null characters.");
+            map.Skybox.Faces.push_back(face);
+        }
+        if (skyboxType == "hdr")
+        {
+            map.Skybox.Type = SkyboxType::HDR;
+            map.Skybox.HDRPath = ReadString(jMap, "skybox_hdr", "", context, true);
+        }
+        else if (skyboxType == "cubemap")
+        {
+            map.Skybox.Type = SkyboxType::Cubemap;
+            if (faces.size() != 6)
+                InvalidField(context + ".skybox_faces", "a cubemap requires exactly six face paths.");
+        }
+        else
+        {
+            InvalidField(context + ".skybox_type", "expected 'hdr' or 'cubemap', got '" + skyboxType + "'.");
         }
 
-        std::cout << "[MapManager] Loaded " << m_Maps.size() << " maps from JSON." << std::endl;
+        map.FloorTexturePath = ReadString(jMap, "floor_texture", "", context, true);
+        map.FloorTextureName = ReadString(jMap, "floor_texture_name", "floor_" + map.Name, context, true);
+        map.AmbientColor = ReadColor(jMap, "ambient_color", map.AmbientColor, context);
+        map.AmbientIntensity = ReadNonNegative(jMap, "ambient_intensity", map.AmbientIntensity, context);
+        map.Lighting.AmbientColor = map.AmbientColor;
+        map.Lighting.AmbientIntensity = map.AmbientIntensity;
+
+        const json& lighting = ReadObject(jMap, "lighting", context);
+        const std::string lightingContext = context + ".lighting";
+        const json& mainLight = ReadObject(lighting, "main_light", lightingContext);
+        const std::string mainContext = lightingContext + ".main_light";
+        glm::vec3 direction = ReadVec3(mainLight, "direction", map.Lighting.MainLight.Direction, mainContext);
+        const float directionScale = std::max({ std::abs(direction.x), std::abs(direction.y), std::abs(direction.z) });
+        if (directionScale == 0.0f)
+            InvalidField(mainContext + ".direction", "must be a non-zero direction vector.");
+        map.Lighting.MainLight.Direction = glm::normalize(direction / directionScale);
+        map.Lighting.MainLight.Color = ReadColor(mainLight, "color", map.Lighting.MainLight.Color, mainContext);
+        map.Lighting.MainLight.Intensity = ReadNonNegative(mainLight, "intensity", map.Lighting.MainLight.Intensity, mainContext);
+        map.Lighting.MainLight.SyncWithSkyboxRotation = ReadBool(mainLight, "sync_with_skybox_rotation",
+            map.Lighting.MainLight.SyncWithSkyboxRotation, mainContext);
+        map.Lighting.MainLight.SkyboxRotationOffset = ReadFloat(mainLight, "skybox_rotation_offset",
+            map.Lighting.MainLight.SkyboxRotationOffset, mainContext);
+        map.Lighting.MainLight.AngularSize = ReadNonNegative(mainLight, "angular_size", map.Lighting.MainLight.AngularSize, mainContext);
+
+        const json& ambient = ReadObject(lighting, "ambient", lightingContext);
+        const std::string ambientContext = lightingContext + ".ambient";
+        map.Lighting.AmbientColor = ReadColor(ambient, "ambient_color", map.Lighting.AmbientColor, ambientContext);
+        map.Lighting.AmbientIntensity = ReadNonNegative(ambient, "ambient_intensity", map.Lighting.AmbientIntensity, ambientContext);
+        map.Lighting.IBLDiffuseIntensity = ReadNonNegative(ambient, "ibl_diffuse_intensity", map.Lighting.IBLDiffuseIntensity, ambientContext);
+        map.Lighting.IBLSpecularIntensity = ReadNonNegative(ambient, "ibl_specular_intensity", map.Lighting.IBLSpecularIntensity, ambientContext);
+
+        const json& pointLights = ReadArray(lighting, "point_lights", lightingContext);
+        for (size_t pointIndex = 0; pointIndex < pointLights.size(); ++pointIndex)
+        {
+            const json& jPoint = pointLights[pointIndex];
+            const std::string pointContext = lightingContext + ".point_lights[" + std::to_string(pointIndex) + "]";
+            if (!jPoint.is_object())
+                InvalidField(pointContext, "expected a point-light object.");
+            PointLightConfig point;
+            point.Position = ReadVec3(jPoint, "position", point.Position, pointContext);
+            point.Color = ReadColor(jPoint, "color", point.Color, pointContext);
+            point.Intensity = ReadNonNegative(jPoint, "intensity", point.Intensity, pointContext);
+            point.Range = ReadPositive(jPoint, "range", point.Range, pointContext);
+            map.Lighting.PointLights.push_back(point);
+        }
+
+        const json& post = ReadObject(jMap, "post_process", context);
+        const std::string postContext = context + ".post_process";
+        map.PostProcess.Exposure = ReadNonNegative(post, "exposure", map.PostProcess.Exposure, postContext);
+        map.PostProcess.Gamma = ReadPositive(post, "gamma", map.PostProcess.Gamma, postContext);
+        map.PostProcess.Contrast = ReadNonNegative(post, "contrast", map.PostProcess.Contrast, postContext);
+        map.PostProcess.Saturation = ReadNonNegative(post, "saturation", map.PostProcess.Saturation, postContext);
+        map.PostProcess.Vignette = ReadNonNegative(post, "vignette", map.PostProcess.Vignette, postContext);
+        if (map.PostProcess.Vignette > 1.0f)
+            InvalidField(postContext + ".vignette", "must be in [0, 1].");
+        map.PostProcess.PixelateEnabled = ReadBool(post, "pixelate_enabled", map.PostProcess.PixelateEnabled, postContext);
+        map.PostProcess.PixelSize = ReadPositive(post, "pixel_size", map.PostProcess.PixelSize, postContext);
+        map.PostProcess.UnderwaterEnabled = ReadBool(post, "underwater_enabled", map.PostProcess.UnderwaterEnabled, postContext);
+
+        map.SpawnRadius = ReadPositive(jMap, "spawn_radius", map.SpawnRadius, context);
+        const std::string terrainType = ReadString(jMap, "terrain", "flat", context);
+        if (terrainType != "flat" && terrainType != "heightmap")
+            InvalidField(context + ".terrain", "expected 'flat' or 'heightmap', got '" + terrainType + "'.");
+        map.Terrain = terrainType == "heightmap" ? TerrainType::Heightmap : TerrainType::Flat;
+        map.EcologyEnabled = ReadBool(jMap, "ecology_enabled",
+            map.Terrain == TerrainType::Heightmap && map.Name == "Nature", context);
+
+        const json& heightmap = ReadObject(jMap, "heightmap", context);
+        const std::string heightmapContext = context + ".heightmap";
+        map.Heightmap.Path = ReadString(heightmap, "path", "", heightmapContext, map.Terrain == TerrainType::Heightmap);
+        map.Heightmap.HeightScale = ReadFloat(heightmap, "height_scale", map.Heightmap.HeightScale, heightmapContext);
+        map.Heightmap.Size = ReadPositive(heightmap, "size", map.Heightmap.Size, heightmapContext);
+        if (heightmap.contains("grid_size"))
+        {
+            const json& gridValue = heightmap["grid_size"];
+            if (!gridValue.is_number())
+                InvalidField(heightmapContext + ".grid_size", "expected an integer.");
+            const double gridSize = gridValue.get<double>();
+            // Cap this project's terrain allocation budget to about four million vertices.
+            if (!std::isfinite(gridSize) || gridSize < 1.0 || gridSize > 2048.0 || std::floor(gridSize) != gridSize)
+                InvalidField(heightmapContext + ".grid_size", "must be an integer in [1, 2048] (terrain allocation budget).");
+            map.Heightmap.GridSize = static_cast<int>(gridSize);
+        }
+
+        const json& props = ReadArray(jMap, "props", context);
+        for (size_t propIndex = 0; propIndex < props.size(); ++propIndex)
+        {
+            const json& jProp = props[propIndex];
+            const std::string propContext = context + ".props[" + std::to_string(propIndex) + "]";
+            if (!jProp.is_object())
+                InvalidField(propContext, "expected a prop object.");
+            PropConfig prop;
+            prop.ModelPath = ReadString(jProp, "model", "", propContext, true);
+            prop.Position = ReadVec3(jProp, "position", prop.Position, propContext);
+            prop.Rotation = ReadVec3(jProp, "rotation", prop.Rotation, propContext);
+            if (jProp.contains("scale"))
+            {
+                prop.Scale = jProp["scale"].is_number()
+                    ? glm::vec3(ReadNumber(jProp["scale"], propContext + ".scale"))
+                    : ReadVec3(jProp, "scale", prop.Scale, propContext);
+            }
+            if (prop.Scale.x == 0.0f || prop.Scale.y == 0.0f || prop.Scale.z == 0.0f)
+                InvalidField(propContext + ".scale", "all scale components must be non-zero.");
+            prop.TargetHeight = ReadNonNegative(jProp, "target_height", prop.TargetHeight, propContext);
+            prop.PBRBrightness = ReadNonNegative(jProp, "pbr_brightness", prop.PBRBrightness, propContext);
+            prop.PBRAmbientIntensity = ReadNonNegative(jProp, "pbr_ambient_intensity", prop.PBRAmbientIntensity, propContext);
+            prop.PBRAmbientColor = ReadColor(jProp, "pbr_ambient_color", prop.PBRAmbientColor, propContext);
+            map.Props.push_back(std::move(prop));
+        }
+
+        map.PlayerStartPos = ReadVec3(jMap, "player_start", map.PlayerStartPos, context);
+        const json& target = ReadObject(jMap, "target_area", context);
+        const std::string targetContext = context + ".target_area";
+        map.TargetArea.WallDistance = ReadPositive(target, "wall_distance", map.TargetArea.WallDistance, targetContext);
+        map.TargetArea.WallWidth = ReadNonNegative(target, "wall_width", map.TargetArea.WallWidth, targetContext);
+        map.TargetArea.WallHeight = ReadNonNegative(target, "wall_height", map.TargetArea.WallHeight, targetContext);
+        map.TargetArea.WallCenterY = ReadFloat(target, "wall_center_y", map.TargetArea.WallCenterY, targetContext);
+        map.TargetArea.Lifetime = ReadPositive(target, "lifetime", map.TargetArea.Lifetime, targetContext);
+        parsedMaps.push_back(std::move(map));
     }
-    catch (const std::exception& e)
-    {
-        std::cout << "[MapManager] JSON parse error: " << e.what() << std::endl;
-        m_Maps.clear();
-    }
-}
 
-void MapManager::SetupDefaultMaps()
-{
-    MapConfig oceanMap;
-    oceanMap.Name = "Ocean";
-    oceanMap.Skybox.Type = SkyboxType::HDR;
-    oceanMap.Skybox.HDRPath = "resources/textures/skybox_hdr/underwater_hdr.hdr";
-    oceanMap.FloorTexturePath = "resources/textures/ground/sand.jpg";
-    oceanMap.FloorTextureName = "floor_ocean";
-    oceanMap.AmbientColor = glm::vec3(0.08f, 0.22f, 0.35f);
-    oceanMap.AmbientIntensity = 0.95f;
-    SyncLegacyAmbient(oceanMap);
-    oceanMap.SpawnRadius = 24.0f;
-    oceanMap.Terrain = TerrainType::Heightmap;
-    oceanMap.Heightmap.Path = "resources/textures/heightmaps/seabed_heightmap.png";
-    oceanMap.Heightmap.HeightScale = 4.0f;
-    oceanMap.Heightmap.GridSize = 256;
-    oceanMap.Heightmap.Size = 60.0f;
-    oceanMap.PlayerStartPos = glm::vec3(0.0f, 1.5f, 8.0f);
-    oceanMap.PostProcess.UnderwaterEnabled = true;
-    oceanMap.EcologyEnabled = true;
-
-    // Add default fish props
-    PropConfig fish1;
-    fish1.ModelPath = "resources/objects/fish/BarramundiFish.gltf";
-    fish1.Position = glm::vec3(6.0f, 2.2f, -12.0f);
-    fish1.Rotation = glm::vec3(0.0f, 45.0f, 0.0f);
-    fish1.Scale = glm::vec3(1.5f);
-    fish1.TargetHeight = 2.2f;
-    fish1.PBRBrightness = 1.15f;
-    fish1.PBRAmbientIntensity = 0.6f;
-    fish1.PBRAmbientColor = glm::vec3(0.45f, 0.85f, 0.95f);
-    oceanMap.Props.push_back(fish1);
-
-    PropConfig fish2 = fish1;
-    fish2.Position = glm::vec3(-8.0f, 3.0f, -20.0f);
-    fish2.Rotation = glm::vec3(0.0f, -30.0f, 0.0f);
-    fish2.Scale = glm::vec3(1.8f);
-    fish2.TargetHeight = 3.0f;
-    oceanMap.Props.push_back(fish2);
-
-    PropConfig fish3 = fish1;
-    fish3.Position = glm::vec3(3.0f, 4.5f, -30.0f);
-    fish3.Rotation = glm::vec3(0.0f, 90.0f, 0.0f);
-    fish3.Scale = glm::vec3(2.0f);
-    fish3.TargetHeight = 4.5f;
-    oceanMap.Props.push_back(fish3);
-
-    PropConfig fish4 = fish1;
-    fish4.Position = glm::vec3(-12.0f, 1.5f, -8.0f);
-    fish4.Rotation = glm::vec3(0.0f, 120.0f, 0.0f);
-    fish4.Scale = glm::vec3(1.3f);
-    fish4.TargetHeight = 1.5f;
-    oceanMap.Props.push_back(fish4);
-
-    m_Maps.push_back(oceanMap);
-
-    MapConfig natureMap;
-    natureMap.Name = "Nature";
-    natureMap.Skybox.Type = SkyboxType::HDR;
-    natureMap.Skybox.HDRPath = "resources/textures/skybox_hdr/citrus_orchard_road_puresky_1k.hdr";
-    natureMap.FloorTexturePath = "resources/textures/ground/nature_rocky_peaks_diffuse.png";
-    natureMap.FloorTextureName = "floor_nature";
-    natureMap.AmbientColor = glm::vec3(0.2f, 0.3f, 0.2f);
-    natureMap.AmbientIntensity = 1.0f;
-    SyncLegacyAmbient(natureMap);
-    natureMap.SpawnRadius = 15.0f;
-    natureMap.Terrain = TerrainType::Heightmap;
-    natureMap.Heightmap.Path = "resources/textures/heightmaps/rocky_peaks_height.png";
-    natureMap.Heightmap.HeightScale = 3.0f;
-    natureMap.Heightmap.GridSize = 128;
-    natureMap.Heightmap.Size = 30.0f;
-    natureMap.PlayerStartPos = glm::vec3(0.0f, 3.0f, 5.0f);
-    m_Maps.push_back(natureMap);
-
-    MapConfig craterMap;
-    craterMap.Name = "Crater Base";
-    craterMap.Skybox.Type = SkyboxType::HDR;
-    craterMap.Skybox.HDRPath = "resources/textures/skybox_hdr/qwantani_night_puresky_1k.hdr";
-    craterMap.FloorTexturePath = "resources/textures/ground/brown_mud_02_diff_1k.png";
-    craterMap.FloorTextureName = "floor_mud";
-    craterMap.AmbientColor = glm::vec3(0.12f, 0.15f, 0.25f);
-    craterMap.AmbientIntensity = 0.55f;
-    SyncLegacyAmbient(craterMap);
-    craterMap.Lighting.MainLight.Direction = glm::normalize(glm::vec3(-0.3f, -0.9f, -0.3f));
-    craterMap.Lighting.MainLight.Color = glm::vec3(0.75f, 0.85f, 1.0f);
-    craterMap.Lighting.MainLight.Intensity = 1.4f;
-    craterMap.Lighting.MainLight.SyncWithSkyboxRotation = false;
-    craterMap.Lighting.MainLight.AngularSize = 0.15f;
-    craterMap.Lighting.IBLDiffuseIntensity = 0.45f;
-    craterMap.Lighting.IBLSpecularIntensity = 0.6f;
-    craterMap.SpawnRadius = 18.0f;
-    craterMap.Terrain = TerrainType::Heightmap;
-    craterMap.Heightmap.Path = "resources/textures/heightmaps/crater_heightmap.png";
-    craterMap.Heightmap.HeightScale = 14.0f;
-    craterMap.Heightmap.GridSize = 256;
-    craterMap.Heightmap.Size = 65.0f;
-    craterMap.PlayerStartPos = glm::vec3(0.0f, 5.0f, 10.0f);
-    craterMap.PostProcess.UnderwaterEnabled = false;
-    craterMap.EcologyEnabled = true;
-
-    // Add default UFO prop
-    PropConfig ufo;
-    ufo.ModelPath = "resources/objects/ufo_flying_saucer_spaceship_ovni/scene.gltf";
-    ufo.Position = glm::vec3(0.0f, 5.0f, -12.0f);
-    ufo.Rotation = glm::vec3(0.0f, 0.0f, 0.0f);
-    ufo.Scale = glm::vec3(0.15f);
-    ufo.TargetHeight = 5.0f;
-    ufo.PBRBrightness = 1.2f;
-    ufo.PBRAmbientIntensity = 0.4f;
-    ufo.PBRAmbientColor = glm::vec3(1.0f, 0.45f, 0.0f);
-    craterMap.Props.push_back(ufo);
-
-    // Add default spaceship props
-    PropConfig ship1;
-    ship1.ModelPath = "resources/objects/light_fighter_spaceship_-_free_-/scene.gltf";
-    ship1.Position = glm::vec3(4.8f, 1.2f, -8.0f);
-    ship1.Rotation = glm::vec3(0.0f, 45.0f, 0.0f);
-    ship1.Scale = glm::vec3(1.0f);
-    ship1.TargetHeight = 1.5f;
-    ship1.PBRBrightness = 1.2f;
-    ship1.PBRAmbientIntensity = 0.4f;
-    ship1.PBRAmbientColor = glm::vec3(0.0f, 0.85f, 1.0f);
-    craterMap.Props.push_back(ship1);
-
-    PropConfig ship2 = ship1;
-    ship2.Position = glm::vec3(-4.8f, 1.5f, -10.0f);
-    ship2.Rotation = glm::vec3(0.0f, -45.0f, 0.0f);
-    ship2.TargetHeight = 1.8f;
-    ship2.PBRAmbientColor = glm::vec3(1.0f, 0.0f, 0.85f);
-    craterMap.Props.push_back(ship2);
-
-    m_Maps.push_back(craterMap);
+    m_Maps.swap(parsedMaps);
+    std::cout << "[MapManager] Loaded " << m_Maps.size() << " maps from JSON." << std::endl;
 }

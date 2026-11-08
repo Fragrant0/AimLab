@@ -7,6 +7,34 @@
 #include <iostream>
 #include <stdexcept>
 
+namespace
+{
+    std::unique_ptr<Terrain> CreateMapTerrain(const MapConfig& map)
+    {
+        auto terrain = std::make_unique<Terrain>();
+        if (map.Terrain == TerrainType::Heightmap)
+        {
+            const HeightmapConfig& heightmap = map.Heightmap;
+            if (!terrain->GenerateFromHeightmap(heightmap.Path, heightmap.HeightScale,
+                                               heightmap.GridSize, heightmap.Size))
+                throw std::runtime_error("[Terrain] Could not load heightmap: " + heightmap.Path);
+        }
+        else
+        {
+            terrain->GenerateFlat(20.0f);
+        }
+        return terrain;
+    }
+
+    std::unique_ptr<EcologySystem> CreateMapEcology(const MapConfig& map, const Terrain* terrain)
+    {
+        auto ecology = std::make_unique<EcologySystem>();
+        if (map.EcologyEnabled && map.Terrain == TerrainType::Heightmap)
+            ecology->Generate(terrain, map.Name);
+        return ecology;
+    }
+}
+
 GameManager::GameManager()
     : m_Window(nullptr),
       m_Camera(glm::vec3(0.0f, 0.0f, 3.0f)),
@@ -209,14 +237,6 @@ void GameManager::LoadMapResources()
     m_MapResourceLoader.Load(m_MapManager->GetCurrentMap(), m_PropModels);
 }
 
-void GameManager::UnloadMapResources(int mapIndex)
-{
-    if (mapIndex < 0 || mapIndex >= m_MapManager->GetMapCount())
-        return;
-
-    m_MapResourceLoader.Unload(m_MapManager->GetMap(mapIndex), m_PropModels);
-}
-
 void GameManager::SetupScene()
 {
     if (!m_TerrainRenderer.Initialize())
@@ -230,35 +250,12 @@ void GameManager::SetupScene()
 
 void GameManager::SetupTerrain()
 {
-    m_Terrain = std::make_unique<Terrain>();
-
-    const MapConfig& currentMap = m_MapManager->GetCurrentMap();
-
-    if (currentMap.Terrain == TerrainType::Heightmap)
-    {
-        const HeightmapConfig& hm = currentMap.Heightmap;
-        if (!m_Terrain->GenerateFromHeightmap(hm.Path, hm.HeightScale,
-                                               hm.GridSize, hm.Size))
-        {
-            std::cout << "Failed to generate terrain from heightmap, falling back to flat" << std::endl;
-            m_Terrain->GenerateFlat(20.0f);
-        }
-    }
-    else
-    {
-        m_Terrain->GenerateFlat(20.0f);
-    }
+    m_Terrain = CreateMapTerrain(m_MapManager->GetCurrentMap());
 }
 
 void GameManager::SetupEcology()
 {
-    m_EcologySystem = std::make_unique<EcologySystem>();
-
-    const MapConfig& currentMap = m_MapManager->GetCurrentMap();
-    if (currentMap.EcologyEnabled && currentMap.Terrain == TerrainType::Heightmap && m_Terrain && m_Terrain->IsInitialized())
-    {
-        m_EcologySystem->Generate(m_Terrain.get(), currentMap.Name);
-    }
+    m_EcologySystem = CreateMapEcology(m_MapManager->GetCurrentMap(), m_Terrain.get());
 }
 
 void GameManager::ProcessInput(GLFWwindow* window, float deltaTime)
@@ -689,7 +686,8 @@ void GameManager::RenderScene(const glm::vec3& mainLightDirection, ShadowMapper*
                                  activeShadowMapper,
                                  m_IBLEnabled,
                                  m_PCSSEnabled,
-                                 shadowBias);
+                                 shadowBias,
+                                 m_SkyboxRotation);
 
         if (!m_FreeFlyMode)
         {
@@ -817,6 +815,11 @@ glm::vec2 GameManager::WorldToScreen(const glm::vec3& worldPos, const glm::mat4&
 
 Camera* GameManager::GetCamera() { return &m_Camera; }
 
+int GameManager::GetCurrentMapIndex() const
+{
+    return m_MapManager ? m_MapManager->GetCurrentMapIndex() : -1;
+}
+
 float GameManager::GetDeltaTime() const { return m_DeltaTime; }
 
 void GameManager::SetMouseFirst(bool first) { m_FirstMouse = first; }
@@ -869,7 +872,8 @@ bool GameManager::PrepareShowcase(int mapIndex, bool debugOverlay)
     if (!m_Initialized || !m_MapManager || mapIndex < 0 || mapIndex >= m_MapManager->GetMapCount())
         return false;
 
-    SwitchMap(mapIndex);
+    if (!SwitchMap(mapIndex))
+        return false;
     ResetDebugAdjustments();
     m_FreeFlyMode = true;
     m_DebugOverlayVisible = debugOverlay;
@@ -909,30 +913,42 @@ bool GameManager::PrepareShowcase(int mapIndex, bool debugOverlay)
     return true;
 }
 
-void GameManager::SwitchMap(int mapIndex)
+bool GameManager::SwitchMap(int mapIndex)
 {
-    if (!m_MapManager || mapIndex == m_MapManager->GetCurrentMapIndex())
-        return;
+    if (!m_Initialized || !m_MapManager || mapIndex < 0 || mapIndex >= m_MapManager->GetMapCount())
+        return false;
+    if (mapIndex == m_MapManager->GetCurrentMapIndex())
+        return true;
 
-    int oldMapIndex = m_MapManager->GetCurrentMapIndex();
-    UnloadMapResources(oldMapIndex);
-
-    m_MapManager->SwitchToMap(mapIndex);
-
-    const MapConfig& newMap = m_MapManager->GetCurrentMap();
-    m_UnderwaterEnabled = newMap.PostProcess.UnderwaterEnabled;
-
-    LoadMapResources();
-    SetupTerrain();
-    SetupEcology();
-
-    glm::vec3 startPos = newMap.PlayerStartPos;
-    if (newMap.Terrain == TerrainType::Heightmap && m_Terrain && m_Terrain->IsInitialized())
+    const MapConfig& newMap = m_MapManager->GetMap(mapIndex);
+    try
     {
-        float terrainHeight = m_Terrain->GetHeightAt(startPos.x, startPos.z);
-        startPos.y = terrainHeight + 1.5f;
+        // Keep the current scene alive until every candidate resource is ready.
+        auto mapLoad = ResourceManager::GetInstance().BeginMapLoad();
+        MapResourceLoader::ModelMap candidateModels;
+        m_MapResourceLoader.Load(newMap, candidateModels);
+        auto candidateTerrain = CreateMapTerrain(newMap);
+        auto candidateEcology = CreateMapEcology(newMap, candidateTerrain.get());
+        glm::vec3 startPos = newMap.PlayerStartPos;
+        if (newMap.Terrain == TerrainType::Heightmap)
+            startPos.y = candidateTerrain->GetHeightAt(startPos.x, startPos.z) + 1.5f;
+
+        // These swaps and the index assignment do not allocate GPU resources.
+        m_MapManager->SwitchToMap(mapIndex);
+        m_PropModels.swap(candidateModels);
+        m_Terrain.swap(candidateTerrain);
+        m_EcologySystem.swap(candidateEcology);
+        m_Camera.Position = startPos;
+        m_FirstMouse = true;
+        m_UnderwaterEnabled = newMap.PostProcess.UnderwaterEnabled;
+        mapLoad.Commit();
     }
-    m_Camera.Position = startPos;
+    catch (const std::exception& error)
+    {
+        std::cerr << "[MapSwitch] Could not load '" << newMap.Name << "': " << error.what()
+                  << ". Kept current map '" << m_MapManager->GetCurrentMap().Name << "'." << std::endl;
+        return false;
+    }
 
     if (m_TargetManager)
     {
@@ -955,6 +971,7 @@ void GameManager::SwitchMap(int mapIndex)
     std::cout << "[MAP SWITCH] " << newMap.Name << " | Spawn: ("
               << newMap.PlayerStartPos.x << ", " << newMap.PlayerStartPos.y << ", "
               << newMap.PlayerStartPos.z << ")" << std::endl;
+    return true;
 }
 
 void GameManager::ClampPlayerToTerrain()

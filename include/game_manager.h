@@ -58,6 +58,8 @@ public:
     void Render();
     void Cleanup();
     bool PrepareShowcase(int mapIndex, bool debugOverlay);
+    bool SwitchMap(int mapIndex);
+    int GetCurrentMapIndex() const;
 
     Camera* GetCamera();
     float GetDeltaTime() const;
@@ -73,11 +75,9 @@ private:
     void SetupTerrain();
     void SetupEcology();
     void LoadMapResources();
-    void UnloadMapResources(int mapIndex);
     void RenderScene(const glm::vec3& mainLightDirection, ShadowMapper* activeShadowMapper);
     void RenderShadowMap(const glm::vec3& mainLightDirection);
     void Shoot();
-    void SwitchMap(int mapIndex);
     void ResetGameState();
     void ClampPlayerToTerrain();
     void ToggleWireframe();

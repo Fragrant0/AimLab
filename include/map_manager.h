@@ -104,7 +104,6 @@ private:
     std::vector<MapConfig> m_Maps;
     int m_CurrentMapIndex;
 
-    void SetupDefaultMaps();
     void LoadMapsFromJson(const std::string& path);
 };
 

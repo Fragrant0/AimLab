@@ -100,6 +100,36 @@ $cases = @(
     @{ Name = "late-post-process"; Files = @{ "post_process.fs" = $null }; Expected = "[Shader] FRAGMENT file read failed (shaders/post_process.fs)" }
 )
 
+function New-MapConfiguration([hashtable]$Overrides) {
+    $candidateMap = @{}
+    foreach ($key in $map.Keys) { $candidateMap[$key] = $map[$key] }
+    foreach ($key in $Overrides.Keys) { $candidateMap[$key] = $Overrides[$key] }
+    return (@{ maps = @($candidateMap) } | ConvertTo-Json -Depth 8)
+}
+
+$baselineConfiguration = New-MapConfiguration @{}
+$configurationCases = @(
+    @{ Name = "missing-json"; Configuration = $null; Expected = "[MapManager] Could not open JSON config: resources/maps_config.json" },
+    @{ Name = "malformed-json"; Configuration = '{"maps": ['; Expected = "[MapManager] Could not parse JSON config resources/maps_config.json" },
+    @{ Name = "trailing-json"; Configuration = $baselineConfiguration + " trailing garbage"; Expected = "[MapManager] Could not parse JSON config resources/maps_config.json" },
+    @{ Name = "empty-maps"; Configuration = '{"maps": []}'; Expected = "resources/maps_config.json.maps: expected a non-empty maps array" },
+    @{ Name = "non-array-maps"; Configuration = '{"maps": {}}'; Expected = "resources/maps_config.json.maps: expected an array" },
+    @{ Name = "bad-map-type"; Configuration = '{"maps": [42]}'; Expected = "maps[0]: expected a map object" },
+    @{ Name = "unknown-terrain"; Configuration = (New-MapConfiguration @{ terrain = "fixture-unknown" }); Expected = "maps[0].terrain: expected 'flat' or 'heightmap'" },
+    @{ Name = "unknown-skybox"; Configuration = (New-MapConfiguration @{ skybox_type = "fixture-unknown" }); Expected = "maps[0].skybox_type: expected 'hdr' or 'cubemap'" },
+    @{ Name = "zero-direction"; Configuration = (New-MapConfiguration @{ lighting = @{ main_light = @{ direction = @(0.0, 0.0, 0.0) } } }); Expected = "maps[0].lighting.main_light.direction: must be a non-zero direction vector" },
+    @{ Name = "float-overflow"; Configuration = (New-MapConfiguration @{ post_process = @{ exposure = 1e100 } }); Expected = "maps[0].post_process.exposure: expected a finite number representable as float" },
+    @{ Name = "heightmap-grid-zero"; Configuration = (New-MapConfiguration @{ terrain = "heightmap"; heightmap = @{ path = "unused-heightmap.png"; grid_size = 0; size = 20.0 } }); Expected = "maps[0].heightmap.grid_size: must be an integer in [1, 2048]" },
+    @{ Name = "heightmap-grid-overbudget"; Configuration = (New-MapConfiguration @{ terrain = "heightmap"; heightmap = @{ path = "unused-heightmap.png"; grid_size = 2049; size = 20.0 } }); Expected = "maps[0].heightmap.grid_size: must be an integer in [1, 2048]" },
+    @{ Name = "heightmap-grid-fraction"; Configuration = (New-MapConfiguration @{ terrain = "heightmap"; heightmap = @{ path = "unused-heightmap.png"; grid_size = 1.5; size = 20.0 } }); Expected = "maps[0].heightmap.grid_size: must be an integer in [1, 2048]" },
+    @{ Name = "heightmap-size-zero"; Configuration = (New-MapConfiguration @{ terrain = "heightmap"; heightmap = @{ path = "unused-heightmap.png"; grid_size = 16; size = 0.0 } }); Expected = "maps[0].heightmap.size: must be greater than zero" },
+    @{ Name = "zero-scale"; Configuration = (New-MapConfiguration @{ props = @(@{ model = "resources/objects/gun/gun.obj"; scale = @(1.0, 0.0, 1.0) }) }); Expected = "maps[0].props[0].scale: all scale components must be non-zero" },
+    @{ Name = "missing-ground"; Configuration = (New-MapConfiguration @{ floor_texture = "resources/textures/ground/fixture_missing.jpg" }); Expected = "[ResourceManager] Failed to load image 'resources/textures/ground/fixture_missing.jpg'" },
+    @{ Name = "missing-hdr"; Configuration = (New-MapConfiguration @{ skybox_hdr = "resources/textures/skybox_hdr/fixture_missing.hdr" }); Expected = "[ResourceManager] Failed to load image 'resources/textures/skybox_hdr/fixture_missing.hdr'" },
+    @{ Name = "missing-heightmap"; Configuration = (New-MapConfiguration @{ terrain = "heightmap"; heightmap = @{ path = "resources/textures/fixture_missing.png"; grid_size = 16; size = 20.0 } }); Expected = "[Terrain] Could not load heightmap: resources/textures/fixture_missing.png" },
+    @{ Name = "missing-prop"; Configuration = (New-MapConfiguration @{ props = @(@{ model = "resources/objects/fixture_missing.obj" }) }); Expected = "Assimp import failed for 'resources/objects/fixture_missing.obj'" }
+)
+
 $originalPath = $env:PATH
 try {
     $env:PATH = "$(Join-Path $repoRoot 'DLL');$originalPath"
@@ -140,7 +170,29 @@ try {
             }
         }
     }
-    Write-Host "[startup] Passed baseline and $($cases.Count) failure cases. Fixtures and logs retained: $fixtureRoot"
+    $configurationPath = Join-Path $fixtureResources "maps_config.json"
+    $configurationBackup = [System.IO.File]::ReadAllBytes($configurationPath)
+    foreach ($case in $configurationCases) {
+        try {
+            if ($null -eq $case.Configuration) {
+                Remove-Item -LiteralPath $configurationPath
+            }
+            else {
+                [System.IO.File]::WriteAllText($configurationPath, $case.Configuration, $utf8)
+            }
+            $result = Invoke-CaptureCase $case.Name
+            if ($result.ExitCode -ne 1 -or !$result.Log.Contains("[FATAL]") -or
+                !$result.Log.Contains($case.Expected) -or $result.Log.Contains("[Capture] Saved") -or
+                (Test-Path -LiteralPath $result.OutputPath)) {
+                throw "Case '$($case.Name)' failed its exit/diagnostic assertions (exit $($result.ExitCode)); expected '$($case.Expected)'. Logs: $fixtureRoot"
+            }
+            Write-Host "[startup] PASS $($case.Name) (exit $($result.ExitCode))"
+        }
+        finally {
+            [System.IO.File]::WriteAllBytes($configurationPath, $configurationBackup)
+        }
+    }
+    Write-Host "[startup] Passed baseline and $($cases.Count + $configurationCases.Count) failure cases. Fixtures and logs retained: $fixtureRoot"
 }
 finally {
     $env:PATH = $originalPath

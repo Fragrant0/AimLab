@@ -8,6 +8,7 @@
 - `shaders/` 按渲染阶段组织 GLSL，顶点与片元着色器分别使用 `.vs`、`.fs`。
 - `resources/maps_config.json` 配置地图、灯光和场景；`resources/objects/`、`resources/textures/`、`resources/fonts/` 保存运行资源。
 - `scripts/` 提供资源生成与冒烟检查；`DLL/` 保存运行依赖；`x64/`、`tmp/` 为本机构建和日志目录。
+- `tests/` 提供独立 OpenGL 集成测试工程，不加入主解决方案。
 
 新增 C++ 模块时，同时更新 `opengl_try.vcxproj` 和 `.vcxproj.filters`。
 
@@ -42,6 +43,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\smoke_build_run.ps
 当前没有独立单元测试框架、测试命名约定或覆盖率门槛。代码变更至少完成 Debug x64 构建和可用的冒烟检查；日志位于 `tmp/smoke_run.log` 与 `tmp/smoke_run.err.log`。手动验证移动、射击、`1/2/3` 切图、空格线框及退出；渲染修改还需检查阴影、天空盒、HUD 和后处理。
 
 修改初始化、错误传播或资源清理时，构建后运行 `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\check_startup_failures.ps1`。该脚本在 `tmp/` 副本中验证成功启动和故障退出，不改原始 shader。
+
+修改地图配置、资源加载或切图逻辑时，运行 `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\check_map_loading.ps1`；它构建独立测试工程，验证失败回退与资源释放，依赖可用的 OpenGL 桌面环境。
 
 ## 提交与 Pull Request
 

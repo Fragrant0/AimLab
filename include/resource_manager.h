@@ -3,6 +3,7 @@
 
 #include <glad/glad.h>
 
+#include <array>
 #include <map>
 #include <memory>
 #include <string>
@@ -14,7 +15,28 @@
 class ResourceManager
 {
 public:
+    class MapLoadTransaction
+    {
+    public:
+        ~MapLoadTransaction() noexcept;
+        MapLoadTransaction(const MapLoadTransaction&) = delete;
+        MapLoadTransaction& operator=(const MapLoadTransaction&) = delete;
+        MapLoadTransaction(MapLoadTransaction&&) = delete;
+        MapLoadTransaction& operator=(MapLoadTransaction&&) = delete;
+        void Commit() noexcept { m_Committed = true; }
+
+    private:
+        friend class ResourceManager;
+        explicit MapLoadTransaction(ResourceManager& manager);
+        void SwapCaches() noexcept;
+
+        ResourceManager& m_Manager;
+        std::array<std::map<std::string, unsigned int>, 6> m_PreviousCaches;
+        bool m_Committed = false;
+    };
+
     static ResourceManager& GetInstance();
+    MapLoadTransaction BeginMapLoad();
 
     Shader* LoadShader(const std::string& name, const char* vertexPath, const char* fragmentPath);
     Shader* GetShader(const std::string& name);
@@ -49,6 +71,8 @@ private:
     ResourceManager(const ResourceManager&) = delete;
     ResourceManager& operator=(const ResourceManager&) = delete;
 
+    void ClearMapResources() noexcept;
+
     // Creates the runtime skybox cubemap used by IBL preprocessing.
     unsigned int CreateCubemapFromHDR(unsigned int hdrTexture, int cubemapSize = 512);
 
@@ -73,6 +97,7 @@ private:
     unsigned int m_BRDFLUT = 0;
     unsigned int m_CubeVAO = 0;
     unsigned int m_CubeVBO = 0;
+    bool m_MapLoadActive = false;
 };
 
 #endif

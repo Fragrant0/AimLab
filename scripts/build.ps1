@@ -4,11 +4,19 @@ param(
     [string]$Configuration = "Debug",
     [string[]]$DependencyIncludeDirectories = @($env:AIMLAB_INCLUDE_DIRS),
     [string[]]$DependencyLibraryDirectories = @($env:AIMLAB_LIBRARY_DIRS),
-    [string]$MSBuildPath
+    [string]$MSBuildPath,
+    [string]$ProjectPath = "opengl_try.sln"
 )
 
 $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
+if (![System.IO.Path]::IsPathRooted($ProjectPath)) {
+    $ProjectPath = Join-Path $repoRoot $ProjectPath
+}
+if (!(Test-Path -LiteralPath $ProjectPath -PathType Leaf)) {
+    throw "Build project does not exist: $ProjectPath"
+}
+$ProjectPath = (Resolve-Path -LiteralPath $ProjectPath).ProviderPath
 
 function Resolve-DependencyDirectories([string[]]$Directories) {
     $resolved = foreach ($entry in $Directories) {
@@ -46,24 +54,19 @@ if (!$MSBuildPath -or !(Test-Path -LiteralPath $MSBuildPath -PathType Leaf)) {
 $includeDirectories = Resolve-DependencyDirectories $DependencyIncludeDirectories
 $libraryDirectories = Resolve-DependencyDirectories $DependencyLibraryDirectories
 $arguments = @(
-    (Join-Path $repoRoot "opengl_try.sln"),
+    $ProjectPath,
     "/m", "/nologo", "/verbosity:minimal",
     "/p:Configuration=$Configuration", "/p:Platform=x64", "/p:PreferredToolArchitecture=x64"
 )
 
-# MSBuild treats semicolons as property separators on its command line.
-if ($includeDirectories) {
-    $escaped = $includeDirectories.Replace("%", "%25").Replace(";", "%3B")
-    $arguments += "/p:AimLabDependencyIncludeDirs=$escaped"
-}
-if ($libraryDirectories) {
-    $escaped = $libraryDirectories.Replace("%", "%25").Replace(";", "%3B")
-    $arguments += "/p:AimLabDependencyLibraryDirs=$escaped"
-}
-
 Write-Host "[build] Building $Configuration x64 with $MSBuildPath"
 $originalPath = $env:PATH
+$originalBuildIncludeDirectories = $env:AimLabDependencyIncludeDirs
+$originalBuildLibraryDirectories = $env:AimLabDependencyLibraryDirs
 try {
+    # Environment properties preserve directory lists without MSBuild CLI escaping.
+    $env:AimLabDependencyIncludeDirs = $includeDirectories
+    $env:AimLabDependencyLibraryDirs = $libraryDirectories
     # Put the selected VS installation's matching compiler/PDB tools first.
     $toolsDirectory = (Get-Item -LiteralPath $MSBuildPath).Directory
     $vcvars = $null
@@ -95,6 +98,8 @@ try {
 }
 finally {
     $env:PATH = $originalPath
+    $env:AimLabDependencyIncludeDirs = $originalBuildIncludeDirectories
+    $env:AimLabDependencyLibraryDirs = $originalBuildLibraryDirectories
 }
 
-Write-Host "[build] Succeeded: $(Join-Path $repoRoot "x64\$Configuration\opengl_try.exe")"
+Write-Host "[build] Succeeded: $ProjectPath ($Configuration x64)"
