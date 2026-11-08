@@ -409,6 +409,7 @@ Makefile
 *.tmp
 *.temp
 *.bak
+/tmp/
 
 # Compressed archives (already tracked source archives)
 *.rar

@@ -4,7 +4,11 @@ out vec4 FragColor;
 in vec2 TexCoords;
 
 uniform sampler2D sceneTexture;
+uniform float exposure;
 uniform float gammaValue;
+uniform float contrast;
+uniform float saturation;
+uniform float vignetteStrength;
 uniform float timeSeconds;
 
 uniform bool pixelateEnabled;
@@ -54,22 +58,22 @@ void main()
     }
 
     // --- Color Grading & Tone Mapping ---
-    // 1. Exposure scaling (cinematic default)
-    color *= 0.62;
+    // 1. Exposure scaling
+    color *= exposure;
 
     // 2. ACES Film Tone Mapping
     color = ACESFilm(color);
 
-    // 3. Saturation correction (cinematic default: 1.02)
-    color = mix(vec3(dot(color, vec3(0.299, 0.587, 0.114))), color, 1.02);
+    // 3. Saturation correction
+    color = mix(vec3(dot(color, vec3(0.299, 0.587, 0.114))), color, saturation);
 
-    // 4. Contrast correction (cinematic default: 1.03)
-    color = (color - 0.5) * 1.03 + 0.5;
+    // 4. Contrast correction
+    color = (color - 0.5) * contrast + 0.5;
 
-    // 5. Vignette (cinematic default: 0.08)
+    // 5. Vignette
     vec2 centered = uv - 0.5;
-    float vignetteMask = smoothstep(0.85, 0.2, length(centered));
-    color *= mix(1.0 - 0.08, 1.0, vignetteMask);
+    float vignetteMask = 1.0 - smoothstep(0.2, 0.85, length(centered));
+    color *= mix(1.0 - vignetteStrength, 1.0, vignetteMask);
 
     // Gamma correction
     color = pow(clamp(color, 0.0, 1.0), vec3(1.0 / max(gammaValue, 0.001)));

@@ -89,7 +89,11 @@ void PostProcessRenderer::RenderToScreen(float timeSeconds, const PostProcessCon
 
     m_Shader->use();
     m_Shader->setInt("sceneTexture", 0);
+    m_Shader->setFloat("exposure", std::max(config.Exposure, 0.0f));
     m_Shader->setFloat("gammaValue", config.Gamma);
+    m_Shader->setFloat("contrast", std::max(config.Contrast, 0.0f));
+    m_Shader->setFloat("saturation", std::max(config.Saturation, 0.0f));
+    m_Shader->setFloat("vignetteStrength", std::clamp(config.Vignette, 0.0f, 1.0f));
     m_Shader->setFloat("timeSeconds", timeSeconds);
     m_Shader->setBool("pixelateEnabled", config.PixelateEnabled);
     m_Shader->setFloat("pixelSize", config.PixelSize);

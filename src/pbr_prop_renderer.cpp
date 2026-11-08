@@ -55,6 +55,9 @@ void PBRPropRenderer::RenderDepth(const MapConfig& map,
     if (models.empty())
         return;
 
+    // The preceding instanced caster pass may have changed the active program.
+    depthShader.use();
+
     for (const PropConfig& prop : map.Props)
     {
         auto it = models.find(prop.ModelPath);

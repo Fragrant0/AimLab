@@ -53,6 +53,7 @@ void TargetSphere::Render(Shader& shader, const glm::mat4& projection, const glm
 
     glm::mat4 model = glm::mat4(1.0f);
     model = glm::translate(model, m_Position);
+    model = glm::scale(model, glm::vec3(m_Radius));
 
     glm::vec3 renderColor = m_Color;
     float alpha = 1.0f;
@@ -86,7 +87,7 @@ void TargetSphere::Activate(float radius, const glm::vec3& position, const glm::
 
     if (!m_Mesh)
     {
-        m_Mesh = std::make_unique<SphereMesh>(radius, 36, 18);
+        m_Mesh = std::make_unique<SphereMesh>(1.0f, 36, 18);
     }
 }
 

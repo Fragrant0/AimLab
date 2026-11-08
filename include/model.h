@@ -34,7 +34,8 @@ class Model
 {
 public:
     // model data 
-    vector<Texture> textures_loaded;	// stores all the textures loaded so far, optimization to make sure textures aren't loaded more than once.
+    // Owns texture handles; Mesh::textures borrows these IDs for drawing.
+    vector<Texture> textures_loaded;
     vector<Mesh>    meshes;
     string directory;
     bool gammaCorrection;
@@ -48,6 +49,27 @@ public:
           BoundsMax(glm::vec3(std::numeric_limits<float>::lowest()))
     {
         loadModel(path);
+    }
+
+    Model(const Model&) = delete;
+    Model& operator=(const Model&) = delete;
+    Model(Model&&) = delete;
+    Model& operator=(Model&&) = delete;
+
+    ~Model()
+    {
+        // Aliased material entries must not delete the same GL handle twice.
+        for (auto it = textures_loaded.begin(); it != textures_loaded.end(); ++it)
+        {
+            const unsigned int textureId = it->id;
+            if (textureId == 0)
+                continue;
+
+            const bool alreadyReleased = std::any_of(textures_loaded.begin(), it,
+                [textureId](const Texture& texture) { return texture.id == textureId; });
+            if (!alreadyReleased)
+                glDeleteTextures(1, &textureId);
+        }
     }
 
     // draws the model, and thus all its meshes

@@ -213,7 +213,11 @@ void MapManager::LoadMapsFromJson(const std::string& path)
             if (jMap.contains("post_process"))
             {
                 const auto& jPost = jMap["post_process"];
+                map.PostProcess.Exposure = jPost.value("exposure", map.PostProcess.Exposure);
                 map.PostProcess.Gamma = jPost.value("gamma", map.PostProcess.Gamma);
+                map.PostProcess.Contrast = jPost.value("contrast", map.PostProcess.Contrast);
+                map.PostProcess.Saturation = jPost.value("saturation", map.PostProcess.Saturation);
+                map.PostProcess.Vignette = jPost.value("vignette", map.PostProcess.Vignette);
                 map.PostProcess.PixelateEnabled = jPost.value("pixelate_enabled", map.PostProcess.PixelateEnabled);
                 map.PostProcess.PixelSize = jPost.value("pixel_size", map.PostProcess.PixelSize);
                 map.PostProcess.UnderwaterEnabled = jPost.value("underwater_enabled", map.PostProcess.UnderwaterEnabled);

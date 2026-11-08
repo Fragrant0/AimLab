@@ -18,6 +18,8 @@ GameManager::GameManager()
       m_FirstMouse(true),
       m_WireframeMode(false),
       m_SkyboxRotation(0.0f),
+      m_ShowcaseMode(false),
+      m_ShowcaseTime(0.0f),
       m_Initialized(false),
       m_WireframePressed(false),
       m_DebugOverlayVisible(false),
@@ -81,10 +83,13 @@ bool GameManager::Initialize(GLFWwindow* window)
         LoadResources();
         SetupScene();
 
+        const MapConfig& currentMap = m_MapManager->GetCurrentMap();
+        m_Camera.Position = currentMap.PlayerStartPos;
+        ClampPlayerToTerrain();
+
         m_TargetManager = std::make_unique<TargetManager>();
         m_TargetManager->Initialize();
 
-        const MapConfig& currentMap = m_MapManager->GetCurrentMap();
         m_UnderwaterEnabled = currentMap.PostProcess.UnderwaterEnabled;
         m_TargetManager->SetTargetWall(
             currentMap.TargetArea.WallDistance,
@@ -243,7 +248,7 @@ void GameManager::SetupEcology()
     }
 }
 
-void GameManager::ProcessInput(GLFWwindow* window)
+void GameManager::ProcessInput(GLFWwindow* window, float deltaTime)
 {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
@@ -255,20 +260,20 @@ void GameManager::ProcessInput(GLFWwindow* window)
     }
 
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-        m_Camera.ProcessKeyboard(FORWARD, m_DeltaTime);
+        m_Camera.ProcessKeyboard(FORWARD, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-        m_Camera.ProcessKeyboard(BACKWARD, m_DeltaTime);
+        m_Camera.ProcessKeyboard(BACKWARD, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-        m_Camera.ProcessKeyboard(LEFT, m_DeltaTime);
+        m_Camera.ProcessKeyboard(LEFT, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-        m_Camera.ProcessKeyboard(RIGHT, m_DeltaTime);
+        m_Camera.ProcessKeyboard(RIGHT, deltaTime);
 
     if (m_FreeFlyMode)
     {
         if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
-            m_Camera.ProcessKeyboard(UP, m_DeltaTime);
+            m_Camera.ProcessKeyboard(UP, deltaTime);
         if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
-            m_Camera.ProcessKeyboard(DOWN, m_DeltaTime);
+            m_Camera.ProcessKeyboard(DOWN, deltaTime);
     }
 
     m_Camera.MovementSpeed = currentSpeed;
@@ -483,11 +488,11 @@ DebugOverlayState GameManager::BuildDebugOverlayState(const glm::vec3& mainLight
     return state;
 }
 
-void GameManager::Update(float deltaTime)
+void GameManager::Update(float deltaTime, float frameTime)
 {
     m_DeltaTime = deltaTime;
 
-    m_FpsTimer += deltaTime;
+    m_FpsTimer += frameTime > 0.0f ? frameTime : deltaTime;
     m_FpsFrameCount++;
     if (m_FpsTimer >= 0.5f)
     {
@@ -530,6 +535,8 @@ void GameManager::Update(float deltaTime)
         m_ScreenShake->Update(deltaTime);
 
     m_SkyboxRotation += deltaTime * RenderSettings::kSkyboxRotationSpeed;
+    if (m_ShowcaseMode)
+        m_ShowcaseTime += deltaTime;
 }
 
 void GameManager::Render()
@@ -555,7 +562,8 @@ void GameManager::Render()
     if (m_PostProcessRenderer)
     {
         m_PostProcessRenderer->EndScene();
-        m_PostProcessRenderer->RenderToScreen(static_cast<float>(glfwGetTime()), postProcessConfig);
+        const float effectTime = m_ShowcaseMode ? m_ShowcaseTime : static_cast<float>(glfwGetTime());
+        m_PostProcessRenderer->RenderToScreen(effectTime, postProcessConfig);
     }
 
     if (m_UIRenderer && m_ScoreSystem && m_MapManager && m_FontRenderer)
@@ -740,7 +748,10 @@ void GameManager::Shoot()
     {
         glm::vec3 hitPos = ray.origin + ray.direction * t;
         float hitDistance = t;
-        float precision = 1.0f - glm::length(hitPos - hitTarget->GetPosition()) / hitTarget->GetRadius();
+        // The surface hit is always one radius from the center. Measure aim offset instead.
+        const glm::vec3 toCenter = hitTarget->GetPosition() - ray.origin;
+        const float aimOffset = glm::length(glm::cross(toCenter, ray.direction));
+        float precision = 1.0f - aimOffset / hitTarget->GetRadius();
         precision = glm::clamp(precision, 0.0f, 1.0f);
 
         hitTarget->OnHit();
@@ -824,6 +835,9 @@ void GameManager::ProcessMouseScroll(float yoffset)
 
 void GameManager::ProcessFramebufferSize(int width, int height)
 {
+    if (width <= 0 || height <= 0)
+        return;
+
     glViewport(0, 0, width, height);
     m_ScreenWidth = width;
     m_ScreenHeight = height;
@@ -835,6 +849,51 @@ void GameManager::ProcessFramebufferSize(int width, int height)
         m_HitFeedback->SetScreenSize(width, height);
     if (m_PostProcessRenderer)
         m_PostProcessRenderer->Resize(width, height);
+}
+
+bool GameManager::PrepareShowcase(int mapIndex, bool debugOverlay)
+{
+    if (!m_Initialized || !m_MapManager || mapIndex < 0 || mapIndex >= m_MapManager->GetMapCount())
+        return false;
+
+    SwitchMap(mapIndex);
+    ResetDebugAdjustments();
+    m_FreeFlyMode = true;
+    m_DebugOverlayVisible = debugOverlay;
+    m_ShowcaseMode = true;
+    m_ShowcaseTime = 0.0f;
+    m_SkyboxRotation = 0.0f;
+    m_FpsTimer = 0.0f;
+    m_FpsFrameCount = 0;
+    m_CurrentFps = 0;
+
+    auto terrainHeight = [this](float x, float z) {
+        return m_Terrain && m_Terrain->IsInitialized() ? m_Terrain->GetHeightAt(x, z) : 0.0f;
+    };
+
+    glm::vec3 position;
+    glm::vec3 focus;
+    if (mapIndex == 0)
+    {
+        position = glm::vec3(10.0f, terrainHeight(10.0f, 17.0f) + 7.0f, 17.0f);
+        focus = glm::vec3(0.0f, terrainHeight(0.0f, -12.0f) + 3.0f, -12.0f);
+    }
+    else if (mapIndex == 2)
+    {
+        position = glm::vec3(12.0f, terrainHeight(12.0f, 16.0f) + 8.0f, 16.0f);
+        focus = glm::vec3(0.0f, terrainHeight(0.0f, -12.0f) + 5.0f, -12.0f);
+    }
+    else
+    {
+        position = glm::vec3(10.0f, terrainHeight(10.0f, 22.0f) + 10.0f, 22.0f);
+        focus = glm::vec3(0.0f, terrainHeight(0.0f, -4.0f) + 2.0f, -4.0f);
+    }
+
+    const glm::vec3 direction = glm::normalize(focus - position);
+    const float yaw = glm::degrees(std::atan2(direction.z, direction.x));
+    const float pitch = glm::degrees(std::asin(std::clamp(direction.y, -1.0f, 1.0f)));
+    m_Camera = Camera(position, glm::vec3(0.0f, 1.0f, 0.0f), yaw, pitch);
+    return true;
 }
 
 void GameManager::SwitchMap(int mapIndex)

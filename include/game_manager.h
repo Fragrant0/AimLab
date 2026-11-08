@@ -53,10 +53,11 @@ public:
     GameManager& operator=(const GameManager&) = delete;
 
     bool Initialize(GLFWwindow* window);
-    void ProcessInput(GLFWwindow* window);
-    void Update(float deltaTime);
+    void ProcessInput(GLFWwindow* window, float deltaTime);
+    void Update(float deltaTime, float frameTime = 0.0f);
     void Render();
     void Cleanup();
+    bool PrepareShowcase(int mapIndex, bool debugOverlay);
 
     Camera* GetCamera();
     float GetDeltaTime() const;
@@ -136,6 +137,8 @@ private:
     std::unique_ptr<ShadowMapper> m_ShadowMapper;
 
     float m_SkyboxRotation;
+    bool m_ShowcaseMode;
+    float m_ShowcaseTime;
     bool m_Initialized;
     bool m_WireframePressed;
     bool m_DebugOverlayVisible;

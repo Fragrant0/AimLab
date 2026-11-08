@@ -35,7 +35,11 @@ struct LightingConfig
 
 struct PostProcessConfig
 {
+    float Exposure = 0.62f;
     float Gamma = 2.2f;
+    float Contrast = 1.03f;
+    float Saturation = 1.02f;
+    float Vignette = 0.08f;
     bool PixelateEnabled = false;
     float PixelSize = 4.0f;
     bool UnderwaterEnabled = false;
