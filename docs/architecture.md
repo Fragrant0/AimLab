@@ -1,60 +1,68 @@
 # 实现与取舍
 
-本文说明当前实现中的模块职责与技术边界，便于从运行效果追踪到代码。
+AimLab 将第一人称交互与实时渲染组织为独立模块。本文介绍各模块如何协作，以及渲染质量、运行成本和资源管理之间的选择。
 
-## 一帧如何产生
+## 帧循环与渲染顺序
 
-1. `main.cpp` 计算帧间隔，处理窗口事件；`GameManager` 接收输入，更新玩法与场景状态。
-2. `ShadowPassRenderer` 渲染方向光深度图：地形、实例化生态、PBR 道具使用各自适合的绘制路径。
-3. 场景写入 `PostProcessRenderer` 的 RGBA16F 颜色缓冲，配合深度 / 模板附件处理可见性。
-4. 地形、生态和 PBR 道具之后绘制靶球、天空盒、粒子与第一人称武器。
-5. 全屏阶段处理水下扭曲、像素化（可叠加）、曝光、ACES、色彩调整和 gamma；HUD 在最后绘制。
+`main.cpp` 负责窗口事件和帧计时，`GameManager` 组织输入、状态更新与渲染。一帧按以下顺序执行：
 
-入口：[main](../src/main.cpp)、[GameManager](../src/game_manager.cpp)、[后处理](../src/post_process_renderer.cpp)。
+1. 处理输入，更新相机、靶球、粒子与生态动画。
+2. 渲染方向光深度图，收集地形、植被、地面动物和 PBR 道具的遮挡信息。
+3. 将场景写入 RGBA16F 颜色缓冲，绘制地形、生态、PBR 道具、靶球、天空盒、粒子和第一人称武器。
+4. 执行水下扭曲、像素化、曝光、ACES 色调映射、色彩调整与 gamma 校正。
+5. 绘制 HUD、计分和命中反馈。
 
-## PBR 与 Split-Sum IBL
+模拟时间步限制在 0.1 秒以内，避免长帧引起过大的状态变化；FPS 使用实际帧间隔统计。最小化窗口时等待事件，恢复后重置时钟。
 
-`pbr_model.fs` 使用 Cook–Torrance 微表面模型，结合 GGX 分布、几何遮蔽项与 Fresnel。模型加载器读取 glTF / OBJ 材质，并支持独立贴图或打包的遮蔽、粗糙度和金属度贴图。
+入口：[主循环](../src/main.cpp)、[GameManager](../src/game_manager.cpp)、[后处理](../src/post_process_renderer.cpp)。
 
-环境光预计算发生在地图资源加载阶段，而非每帧执行：
+## PBR 与环境光照
 
-| 数据 | 当前尺寸 | 用途 |
+PBR shader 使用 Cook–Torrance 微表面模型，结合 GGX 分布、几何遮蔽项和 Fresnel。模型加载器支持 glTF / OBJ 材质，以及独立或打包的遮蔽、粗糙度和金属度贴图。
+
+Split-Sum IBL 将环境光积分转为预计算贴图与运行时采样：
+
+| 数据 | 尺寸 | 用途 |
 | --- | --- | --- |
-| HDR environment cubemap | 512² / 面 | 环境采样与天空盒 |
+| HDR environment cubemap | 512² / 面 | 天空盒和环境预计算输入 |
 | Irradiance cubemap | 32² / 面 | 漫反射环境光 |
-| Prefilter cubemap | 128² / 面，预计算并采样 5 级 mip（0–4） | 用粗糙度选择镜面环境光层级 |
-| BRDF LUT | 256² | Split-Sum 镜面积分近似 |
+| Prefilter cubemap | 128² / 面，预计算并采样 mip 0–4 | 按粗糙度选择镜面环境光层级 |
+| BRDF LUT | 256² | 镜面 BRDF 积分近似 |
 
-这项取舍将积分成本集中在加载时；代价是同步切换地图可能停顿。后续可离线烘焙 IBL 数据或缓存已加载环境。
+环境图相关预计算随地图加载执行，BRDF LUT 在地图之间共享。这减少了逐帧积分成本，同时将一部分开销集中到加载阶段。
 
-源码：[ResourceManager](../src/resource_manager.cpp)、[PBR](../shaders/pbr_model.fs)、[irradiance](../shaders/irradiance.fs)、[prefilter](../shaders/prefilter.fs)、[BRDF LUT](../shaders/brdf.fs)。
+天空盒、irradiance 法线和 prefilter 反射方向采用一致的环境空间旋转。直射光和点光仍在世界空间计算，主方向光是否跟随天空盒由地图配置决定。
 
-## 阴影为什么需要搜索与滤波
+源码：[资源预计算](../src/resource_manager.cpp)、[PBR shader](../shaders/pbr_model.fs)、[irradiance](../shaders/irradiance.fs)、[prefilter](../shaders/prefilter.fs)、[BRDF LUT](../shaders/brdf.fs)。
 
-方向光使用 4096² 深度纹理。接收点先变换到光空间，再与采样深度比较；法线相关偏移用于缓解自阴影。
+## 方向光与软阴影
 
-PCF 路径在邻域比较多次深度并平均。PCSS 风格路径先进行 16 次遮挡物搜索，再根据平均遮挡深度和接收点的距离关系，使用经验系数调整 16 次 Poisson PCF 的滤波半径。它呈现接触处较硬、远离遮挡物更软的外观，但没有完整的物理面积光源模型。
+方向光使用单张 4096² 深度纹理。接收点变换到光空间后，与深度纹理中的遮挡信息比较；法线相关偏移用于缓解自阴影。
 
-阴影偏移是在 acne 与 peter-panning 之间权衡。现有投影范围固定，远处精度、投影随相机移动的稳定性仍需改进；不能仅凭一张截图断言消除了闪烁。
+PCF 使用邻域深度比较的平均值平滑边缘。PCSS 风格路径先进行 16 次遮挡物搜索，再根据平均遮挡深度、接收深度和光源参数估计半影宽度，最多执行 16 次 Poisson PCF 采样。半影使用经验近似，以固定采样预算呈现接触处较硬、远离遮挡物更软的效果。
 
-源码：[ShadowMapper](../src/shadow_mapper.cpp)、[ShadowPassRenderer](../src/shadow_pass_renderer.cpp)、[terrain.fs](../shaders/terrain.fs)。
+深度偏移需要在 acne 与 peter-panning 之间调整。阴影投影覆盖相机附近的固定范围，纹理精度、覆盖距离和投影稳定性之间存在取舍。
 
-## CPU / GPU 的职责边界
+源码：[ShadowMapper](../src/shadow_mapper.cpp)、[阴影阶段](../src/shadow_pass_renderer.cpp)、[地形 shader](../shaders/terrain.fs)。
+
+## CPU / GPU 任务划分
 
 | 系统 | CPU | GPU |
 | --- | --- | --- |
-| 粒子 | 固定容量对象池、free list、位置与寿命更新、整理活跃实例 | 实例化 billboard 绘制，一批活跃粒子使用一次 draw call |
-| 生态 | 根据地形布置对象、更新场景动画与实例数据 | 分组实例化；植被与地面动物参与阴影阶段，鸟类暂不投影 |
-| 靶球 | 生成、复用、射线碰撞与收缩状态 | 单位球网格按当前半径变换 |
-| 地形 | 读取高度图、生成顶点和法线、查询世界坐标高度 | 上传后的网格绘制与光照 |
+| 粒子 | 对象池与 free list、位置和寿命更新、整理活跃实例 | 实例化 billboard 绘制 |
+| 生态 | 依地形布置对象、更新运动和实例数据 | 分组实例化；植被与地面动物参与阴影阶段 |
+| 靶球 | 生成、复用、碰撞与收缩状态 | 单位球网格按当前半径变换 |
+| 地形 | 读取 8 / 16 位高度图、生成顶点与法线、查询高度 | 网格绘制与光照 |
 
-粒子上限为 2,000，没有 compute shader 或 transform feedback 模拟。减少 draw call 不等于消除 CPU 更新、实例上传、透明片元覆盖或对象分配成本。
+粒子池容量为 2,000，活跃粒子合并为一次实例化绘制。CPU 更新、实例数据上传和透明片元覆盖仍产生开销，性能分析需要分别观察这些阶段。
 
-源码：[ParticleSystem](../src/particle_system.cpp)、[EcologySystem](../src/ecology_system.cpp)、[Terrain](../src/terrain.cpp)。
+地形保留 CPU 高度数据，供玩家贴地、目标生成和生态布置复用，代价是同时维护 CPU 数据和 GPU 网格。
 
-## 射击与计分
+源码：[粒子](../src/particle_system.cpp)、[生态](../src/ecology_system.cpp)、[地形](../src/terrain.cpp)。
 
-相机位置与朝向形成归一化射线，对活跃靶球求交，选择最近的正向交点。球面交点用于粒子和命中提示；射线到球心的垂直距离用于中心精度评分：
+## 射线命中与计分
+
+相机位置与朝向形成归一化射线，对活跃靶球求交，选择最近的正向交点。交点位置用于粒子和命中提示，射线到球心的垂直距离用于精度评分：
 
 ```text
 offset = targetCenter - rayOrigin
@@ -62,55 +70,47 @@ distanceToCenterLine = length(cross(offset, normalizedRayDirection))
 precision = clamp(1 - distanceToCenterLine / targetRadius, 0, 1)
 ```
 
-中心命中趋近 1，边缘趋近 0。使用“球面交点到球心的距离”会恒等于半径，无法区分中心和边缘。计分还叠加距离与连击奖励；当前射线查询未包含场景遮挡。
+中心命中趋近 1，边缘趋近 0。计分叠加精度、距离和连击奖励，再由 HUD、屏幕震动与后坐力形成反馈。当前查询范围是靶球，场景几何的遮挡查询属于后续玩法扩展。
 
-源码：[Raycast](../src/raycast.cpp)、[GameManager::Shoot](../src/game_manager.cpp)、[ScoreSystem](../src/score_system.cpp)。
+源码：[Raycast](../src/raycast.cpp)、[射击流程](../src/game_manager.cpp)、[ScoreSystem](../src/score_system.cpp)。
 
-## 配置与资源生命周期
+## 配置驱动的场景切换
 
-`MapManager` 在启动时读取 `resources/maps_config.json`，先在局部容器中校验完整配置，再提交地图列表。缺失文件、非法 JSON、错误字段类型、零光照方向或不可用的地形网格参数会明确报错，不再退回过期的默认资源。资源路径在实际加载时验证，未选中的地图可以在尝试切换时报告缺失资源。
+`MapManager` 在启动时读取 `resources/maps_config.json`，校验字段类型、数值范围及路径字段的完整性，再提交地图列表。文件解码与 GPU 上传在对应地图加载时进行。`heightmap.grid_size` 限制为整数 `1–2048`，约束地形网格的分配规模。
 
-`MapResourceLoader` 加载地表、天空盒和模型，同地图中相同模型路径只加载一次。切换采用 `MapLoadTransaction`：旧地图缓存暂存，候选纹理、模型、地形和生态全部就绪后，才交换场景并提交地图索引。失败释放候选资源并恢复旧缓存，保留相机、靶场和计分状态；成功后释放旧场景。Shader、BRDF LUT 与共享 cube 几何不随地图事务重复创建。
+场景切换通过 `MapLoadTransaction` 分三步处理：
 
-该方案仍为同步加载，属于运行时切换，不是文件热重载。为了保留失败回退能力，准备阶段会同时占用新旧地图的资源；异步加载、离线 IBL 与显存预算仍是后续工作。`heightmap.grid_size` 限制为整数 `1–2048`，避免无约束地分配地形网格。
+1. 暂存当前地图缓存，加载候选纹理、模型、地形与生态。同地图中相同模型路径只加载一次。
+2. 候选场景齐备后，交换场景对象并提交地图索引。
+3. 成功时释放旧场景；失败时释放候选资源并恢复旧缓存，保留相机、靶场和计分状态。
 
-Shader 和模型由 RAII / `std::unique_ptr` 持有；模型缓存独占材质纹理，Mesh 仅借用纹理 ID，模型析构去重释放这些纹理。FBO、VAO、VBO 等 GL 句柄有清理入口。清理必须发生在 OpenGL context 销毁前。局部状态 guard 用于恢复深度测试、混合和多边形模式等状态。
+Shader、BRDF LUT 与共享 cube 几何跨事务保留。切换同步执行，便于控制 GL context 和资源生命周期；准备阶段同时持有新旧场景，增加资源峰值，并可能造成加载停顿。
 
-模拟使用受限时间步，FPS 统计使用实际帧间隔；最小化窗口时等待事件并重置时钟，避免恢复时产生过大步长。
+源码：[配置解析](../src/map_manager.cpp)、[地图资源加载](../src/map_resource_loader.cpp)、[缓存事务](../include/resource_manager.h)、[场景提交](../src/game_manager.cpp)。
 
-## 初始化与失败处理
+## 资源所有权与错误处理
 
-Shader 只有在文件读取、两阶段编译和 program 链接全部成功后才提交 ID；失败抛出带文件路径、阶段与驱动日志的异常，并释放中间对象。IBL 预计算使用局部资源保护，在完整成功后提交输出贴图。
+Shader 和模型通过 RAII / `std::unique_ptr` 持有。模型独占材质纹理，Mesh 借用纹理 ID；模型析构时去重释放纹理。FBO、VAO、VBO 等对象按句柄清理，局部状态 guard 恢复临时修改的 OpenGL 状态。
 
-`GameManager` 检查各模块的初始化结果。即使只完成了一部分初始化，清理也会按现有句柄执行；所有 GL 资源在 context 销毁前释放。后处理和阴影 FBO 必须完整才可使用，后处理 resize 先创建新目标，失败保留旧目标。
+Shader 在读取、编译和链接成功后保存 program ID。读取失败抛出带路径与阶段的异常，编译或链接失败另附驱动日志；中间对象随作用域释放。IBL 预计算采用相同的资源保护方式，在完整成功后提交输出贴图。
 
-主运行段捕获失败并返回非零状态；窗口回调在自身边界捕获异常并请求退出，避免 C++ 异常跨越 GLFW 的原生回调边界。
+初始化检查模块返回值和 FBO 完整性。调整窗口尺寸时先创建新渲染目标，成功后替换旧目标。主运行段捕获错误并返回非零状态；窗口回调在自身边界捕获异常并请求退出。GL 资源的清理发生在 context 销毁之前。
 
-`scripts/check_startup_failures.ps1` 使用物理副本中的小型场景，验证正常基线与 27 种失败：缺失或非法配置、资源缺失、源码读取与 GLSL 编译/链接错误，以及 IBL、字体和后处理晚期失败。它检查明确的退出码与阶段诊断，并保留日志；不修改仓库内的原始资源。
+源码：[Shader](../include/shader.h)、[Model](../include/model.h)、[后处理目标](../src/post_process_renderer.cpp)、[GL 状态保护](../include/gl_state_guard.h)。
 
-`scripts/check_map_loading.ps1` 构建独立的真实 OpenGL 集成测试。它注入缺失或损坏的纹理、HDR、模型、材质与高度图，验证切图失败时索引、相机和旧缓存不变；同时检查候选纹理与网格已释放、失败后仍可成功切图，以及成功提交后旧资源被删除。
+## 验证与画面对照
 
-## 可复现的视角检查
+- [启动冒烟检查](../scripts/smoke_build_run.ps1)：构建并启动程序，检查主要模块的初始化。
+- [启动失败回归](../scripts/check_startup_failures.ps1)：在隔离场景中验证配置、资源和 shader 错误的诊断及退出行为。
+- [地图加载集成测试](../scripts/check_map_loading.ps1)：使用真实 OpenGL context，检查失败回退、候选资源释放、成功提交和后续渲染。
+- `--capture`：固定地图、视角与模拟步长，读取 OpenGL back buffer 并输出 PPM，便于进行画面对照。
 
-`--capture` 通过 `GameManager::PrepareShowcase` 设置地图与地形相对视角，关闭输入，执行固定步长更新，再读取最终的 OpenGL back buffer。图片逐行翻转写入 P6 PPM，读取过程检测 OpenGL 错误。该入口便于检查各地图是否可渲染与比较画面；生态布局可能使用随机生成，不保证逐像素一致，也不替代性能测量。
+交互行为、长期运行和性能数据需要单独验证。构建与检查命令见 [README](../README.md#快速开始)。
 
-## 已完成的重要修复
+## 设计边界与扩展方向
 
-| 项目 | 当前行为 | 验证入口 |
-| --- | --- | --- |
-| 初始化失败与部分资源清理 | Shader / FBO 失败向上传播，退出前释放已创建的 GL 对象；失败 resize 保留旧目标 | `scripts/check_startup_failures.ps1` |
-| 配置与资源失败策略 | 完整校验 JSON；模型、纹理及高度图失败明确报错；切图失败保留可用旧场景 | `scripts/check_startup_failures.ps1`、`scripts/check_map_loading.ps1` |
-| 环境反射方向 | 天空盒、irradiance 与 prefilter 使用相同的环境空间旋转，直射光仍在世界空间计算 | `skybox.vs` / `pbr_model.fs` 旋转公式核对、地图截图检查 |
+射击体验优先补充地形和模型遮挡查询，以场景最近交点决定命中结果。
 
-## 优先改进事项
+渲染方面，主要方向是稳定阴影投影、统一颜色贴图的 sRGB 处理，以及接入 Bloom 的提取、模糊和 HDR 合成。当前鸟类参与颜色绘制，阴影阶段覆盖植被和地面动物。
 
-| 优先级 | 问题 | 下一步与验证方式 |
-| --- | --- | --- |
-| 高 | 射击尚未检测地形与模型遮挡 | 加入场景最近交点查询；用遮挡物前后靶球验证无法穿透命中 |
-| 中 | 阴影投影稳定性 | 在固定光空间基准中量化投影，录制相机平移前后阴影边缘对比 |
-| 中 | 地面颜色纹理与模型 albedo 的 sRGB 处理不同 | 明确颜色贴图与数据贴图的线性化规则，使用灰卡或固定测试材质对照 |
-| 中 | 同步加载停顿、准备阶段资源峰值及性能证据不足 | 记录 CPU / GPU 帧时、IBL 加载耗时、显存峰值与粒子规模，再评估离线预计算、缓存和后台加载 |
-| 中 | 本机 GLFW 与 Debug 应用的 CRT 配置不同 | 使用匹配 `/MDd` 的 Debug GLFW，消除 `LNK4098`，并在无个人工程配置的环境验证依赖设置 |
-| 后续 | Bloom shader 尚未接通 | 补齐亮部提取、可分离模糊和 HDR 合成，并比较开关效果与 GPU 成本 |
-
-构建与启动检查见 [README](../README.md#快速开始)。自动冒烟检查只验证初始化，不能代替交互与视觉回归。
+加载与性能优化应先记录 CPU / GPU 帧时、IBL 预计算耗时和资源峰值，再选择环境缓存、离线预计算或后台加载方案。

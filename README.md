@@ -57,7 +57,7 @@ AimLab 是一个将**实时渲染实验与第一人称瞄准交互**结合的个
 
 | 方向 | 实际实现 | 代码入口 |
 | --- | --- | --- |
-| **PBR 与环境光照** | Cook–Torrance BRDF、GGX 与 Split-Sum IBL；HDR 环境图预计算 irradiance、粗糙度预滤波 cubemap 和 BRDF LUT | [PBR shader](shaders/pbr_model.fs) · [资源预计算](src/resource_manager.cpp) |
+| **PBR 与环境光照** | Cook–Torrance BRDF、GGX 与 Split-Sum IBL；HDR 环境图预计算 irradiance、粗糙度预滤波 cubemap 和 BRDF LUT，环境采样随天空盒旋转 | [PBR shader](shaders/pbr_model.fs) · [资源预计算](src/resource_manager.cpp) |
 | **动态阴影** | 4096² 方向光深度图；Poisson PCF、遮挡物搜索与可变滤波半径的 PCSS 风格软阴影；法线相关深度偏移 | [阴影阶段](src/shadow_pass_renderer.cpp) · [地形 shader](shaders/terrain.fs) |
 | **HDR 与后处理** | RGBA16F 场景缓冲；ACES 色调映射、gamma 校正；配置驱动的曝光、对比度、饱和度与暗角，支持水下扭曲和像素化 | [后处理](src/post_process_renderer.cpp) · [合成 shader](shaders/post_process.fs) |
 | **地形与场景** | 8 / 16 位高度图、法线生成和世界坐标高度查询；JSON 描述天空盒、灯光、模型、出生点与靶场参数 | [地形](src/terrain.cpp) · [场景配置](resources/maps_config.json) |
@@ -207,7 +207,7 @@ AimLab/
 - 地图切换为**同步加载**；候选场景准备成功后才提交，失败保留旧场景。准备阶段同时持有新旧资源，仍需优化停顿与显存峰值；尚未实现后台加载或 JSON 文件热重载。
 - 粒子采用 **CPU 模拟 + GPU 实例化绘制**，当前容量为 2,000；后续补齐规模测试与 CPU / GPU 帧时基准。
 - 射击检测针对靶球，尚未加入完整的地形与场景模型遮挡检测。
-- 软阴影使用经验半影近似；阴影投影稳定性与全场景颜色空间一致性仍有改进空间。PBR 的 IBL 采样方向已与天空盒旋转同步。
+- 软阴影使用经验半影近似；阴影投影稳定性与全场景颜色空间一致性仍有改进空间。
 - Bloom 提取与模糊 shader 尚未接入当前渲染管线；后续计划补齐合成与可复现的效果对比。
 
 欢迎通过 issue 讨论渲染问题或复现情况。贡献约定见 [Repository Guidelines](AGENTS.md)。
