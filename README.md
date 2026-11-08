@@ -1,86 +1,202 @@
-# OpenGL FPS Aim Lab Demo
+<h1 align="center">AimLab</h1>
 
-一个基于 C++17 / OpenGL 3.3 的第一人称射击交互与实时渲染系统。项目重点实现了 PBR/IBL、HDR 天空盒、高度图地形、PCSS 阴影、后处理、多地图配置化、射击命中反馈和模块化客户端架构。
+<p align="center"><strong>用 C++ 与 OpenGL，从渲染管线到一次命中的完整反馈。</strong></p>
+<p align="center">A real-time rendering playground with first-person aim training.</p>
 
-## 项目特点
+<p align="center">
+  <img alt="C++17" src="https://img.shields.io/badge/C%2B%2B-17-00599C?style=flat-square&logo=cplusplus&logoColor=white">
+  <img alt="OpenGL 3.3 Core" src="https://img.shields.io/badge/OpenGL-3.3_Core-5586A4?style=flat-square&logo=opengl&logoColor=white">
+  <img alt="GLSL" src="https://img.shields.io/badge/Shading-GLSL-8B5CF6?style=flat-square">
+  <img alt="Windows x64" src="https://img.shields.io/badge/Platform-Windows_x64-0078D6?style=flat-square">
+  <img alt="Visual Studio 2022" src="https://img.shields.io/badge/Build-VS_2022-5C2D91?style=flat-square">
+</p>
 
-这个项目不仅是单一的 Shader 练习，而是一个完整的小型实时渲染与 FPS 交互系统，具备以下核心特点：
+<p align="center">
+  <a href="#实机预览">实机预览</a> ·
+  <a href="#技术亮点">技术亮点</a> ·
+  <a href="#快速开始">快速开始</a> ·
+  <a href="#操作说明">操作说明</a> ·
+  <a href="docs/architecture.md">实现与取舍</a>
+</p>
 
-- 渲染管线与光影：包含 PBR/IBL 管线、HDR 环境光、高度图地形、PCSS 软阴影、后处理风格化，且支持场景参数配置化。
-- 系统设计与交互：采用 C++ 模块化架构，实现了 OpenGL 资源管理、输入与相机控制、射线命中判定、对象生命周期管理、HUD 界面、粒子系统和运行时地图无缝切换。
+---
 
-## 技术栈
+AimLab 是一个将**实时渲染实验与第一人称瞄准交互**结合的个人项目。使用 C++17 和 OpenGL 3.3 Core Profile，实现 PBR / IBL、接触软阴影、高度图地形、屏幕后处理，以及射线命中、计分和粒子反馈。
 
-- C++17
-- OpenGL 3.3 Core Profile
-- GLFW / GLAD / GLM
-- Assimp
-- stb_image / stb_truetype
-- nlohmann/json
-- Visual Studio 2022 / MSBuild / Debug x64
+项目关注两个问题：**如何让材质在不同环境光下保持合理的表现，以及如何把渲染、资源和玩法组织成可维护的程序。** 三套 JSON 配置场景和运行时调试开关，让效果可以直接观察、比较和解释。
 
-## 项目结构
+## 实机预览
 
-```text
-include/                  C++ module headers
-src/                      C++ implementation files and entry point
-shaders/                  GLSL shaders grouped by render pass
-resources/maps_config.json Scene, terrain, lighting, post-process, and prop config
-resources/objects/        Runtime 3D assets
-resources/textures/ground Ground material textures
-resources/textures/terrain Terrain surface textures
-resources/textures/heightmaps Heightmap data
-resources/textures/skybox_hdr HDR environment maps for skybox and IBL
-scripts/                  Build and smoke-test helpers
-DLL/                      Runtime third-party DLLs
-```
+![Nature：高度图山地、HDR 环境光与 PBR 模型](docs/images/nature.jpg)
 
-## 主要模块
+<p align="center"><em>Nature · 高度图山地 / HDR 环境光 / PBR 展示模型</em></p>
 
-| 模块 | 文件 | 功能职责与技术细节 |
-| --- | --- | --- |
-| 游戏主循环 | `src/main.cpp`, `include/game_manager.h`, `src/game_manager.cpp` | 初始化、输入、更新、渲染和资源释放的完整客户端框架 |
-| 资源管理 | `include/resource_manager.h`, `src/resource_manager.cpp` | Shader、Texture、Cubemap、HDR、IBL 资源加载、缓存与释放 |
-| 地图配置 | `include/map_manager.h`, `src/map_manager.cpp`, `resources/maps_config.json` | 用 JSON 驱动天空盒、地形、地表纹理、出生点、灯光和 PBR 摆放物 |
-| 高度图地形 | `include/terrain.h`, `src/terrain.cpp` | 8/16-bit 高度图、法线重建、GPU 网格上传、运行时高度查询 |
-| PBR 与 IBL | `shaders/pbr_model.*`, `shaders/irradiance.fs`, `shaders/prefilter.fs`, `shaders/brdf.fs` | Cook-Torrance、Fresnel、预滤波环境贴图、BRDF LUT、tone mapping |
-| 阴影系统 | `include/shadow_mapper.h`, `src/shadow_mapper.cpp`, `src/shadow_pass_renderer.cpp` | 主光源深度图、软阴影采样、地图光照方向联动 |
-| 后处理 | `include/post_process_renderer.h`, `src/post_process_renderer.cpp`, `shaders/post_process.fs` | 屏幕空间滤镜、曝光、色调映射和画面风格控制 |
-| 程序化生态 | `include/ecology_system.h`, `src/ecology_system.cpp` | 按地形高度、坡度和间距布置生态对象 |
-| 射击反馈 | `include/raycast.h`, `include/target_manager.h`, `include/weapon.h` | 输入、射线判定、分数、粒子、HUD 和屏幕震动闭环 |
-| 粒子系统 | `include/particle_system.h`, `src/particle_system.cpp` | 固定容量对象池、free list 分配、GPU instancing |
+<table>
+  <tr>
+    <td width="50%"><img src="docs/images/ocean.jpg" alt="Ocean 水下场景"></td>
+    <td width="50%"><img src="docs/images/crater.jpg" alt="Crater Base 科幻场景"></td>
+  </tr>
+  <tr>
+    <td align="center"><strong>Ocean</strong><br>海床地形、水下扭曲与色彩衰减</td>
+    <td align="center"><strong>Crater Base</strong><br>陨石坑、飞船模型与彩色点光源</td>
+  </tr>
+</table>
+
+<details>
+<summary><strong>查看运行时调试面板</strong></summary>
+
+![实时调试：IBL、软阴影、后处理与参数对照](docs/images/debug-overlay.jpg)
+
+通过 `F1` 展开面板，比较 IBL、PCF / PCSS 风格软阴影、水下与像素化效果；可直接调节阴影偏移和像素大小。
+
+</details>
+
+以上图片均为程序固定视角下的实机截图，使用自由相机隐藏武器和普通 HUD。场景中的模型、纹理和环境图包含第三方素材。
 
 ## 技术亮点
 
-### HDR 天空盒到 IBL
+| 方向 | 实际实现 | 代码入口 |
+| --- | --- | --- |
+| **PBR 与环境光照** | Cook–Torrance BRDF、GGX 与 Split-Sum IBL；HDR 环境图预计算 irradiance、粗糙度预滤波 cubemap 和 BRDF LUT | [PBR shader](shaders/pbr_model.fs) · [资源预计算](src/resource_manager.cpp) |
+| **动态阴影** | 4096² 方向光深度图；Poisson PCF、遮挡物搜索与可变滤波半径的 PCSS 风格软阴影；法线相关深度偏移 | [阴影阶段](src/shadow_pass_renderer.cpp) · [地形 shader](shaders/terrain.fs) |
+| **HDR 与后处理** | RGBA16F 场景缓冲；ACES 色调映射、gamma 校正；配置驱动的曝光、对比度、饱和度与暗角，支持水下扭曲和像素化 | [后处理](src/post_process_renderer.cpp) · [合成 shader](shaders/post_process.fs) |
+| **地形与场景** | 8 / 16 位高度图、法线生成和世界坐标高度查询；JSON 描述天空盒、灯光、模型、出生点与靶场参数 | [地形](src/terrain.cpp) · [场景配置](resources/maps_config.json) |
+| **射击反馈** | 射线与球体求交、最近命中选择、中心精度与距离奖励、连击、命中标记、后坐力和屏幕震动 | [射线检测](src/raycast.cpp) · [计分](src/score_system.cpp) |
+| **粒子与对象复用** | CPU 更新粒子，GPU 实例化绘制；固定 2,000 容量对象池与 free list，批量上传活跃实例 | [粒子系统](src/particle_system.cpp) |
+| **模块化资源管理** | 独立渲染阶段、RAII 与 `std::unique_ptr` 所有权、局部 GL 状态保护；同一地图内按模型路径复用资源 | [主循环组织](src/game_manager.cpp) · [地图资源](src/map_resource_loader.cpp) |
 
-`ResourceManager::LoadHDRSkybox` 会加载 HDR 等距柱状图，将其转换为 cubemap，并生成 irradiance map、prefilter map 和 BRDF LUT。PBR shader 使用这些贴图组合漫反射环境光和粗糙度相关的镜面反射，让模型能在不同地图天空盒下获得不同环境光照。
+### 渲染流程
 
-### 多地图配置化
+```mermaid
+flowchart LR
+    HDR[HDR 环境图] --> IBL[地图加载时预计算 IBL]
+    IBL --> Scene
+    Shadow[方向光深度阶段] --> Scene[地形 / 生态 / PBR 模型 / 靶球 / 天空盒]
+    Scene --> HDRBuffer[RGBA16F 场景缓冲]
+    Particles[实例化粒子与第一人称武器] --> HDRBuffer
+    HDRBuffer --> Post[屏幕效果 / ACES / Gamma]
+    Post --> HUD[HUD 与命中反馈]
+    HUD --> Screen[屏幕输出]
+```
 
-`resources/maps_config.json` 描述地图名称、HDR 路径、地形模式、地表纹理、主光方向、点光源和 PBR 展示模型。运行时按 `1/2/3` 切换地图，系统会卸载旧资源、加载新资源、重建地形和生态布置。
+更详细的 CPU / GPU 分工、资源生命周期、算法边界与改进方向，见 [实现与取舍](docs/architecture.md)。
 
-### 高度图地形
+## 快速开始
 
-`Terrain` 支持从高度图生成网格，自动计算法线并上传 VAO/VBO/EBO。运行时通过高度图采样获得世界坐标高度，用于玩家贴地、生态生成和对象摆放。
+### 环境与依赖
 
-### 射击交互闭环
+- **Windows x64**，Visual Studio 2022，安装“使用 C++ 的桌面开发”、v143 工具集及 Windows SDK。
+- 支持 **OpenGL 3.3 Core** 的图形驱动。
+- 外部依赖：GLFW、GLAD（OpenGL 3.3 loader）、GLM、Assimp。将它们的头文件放入可配置的 include 目录，并准备 x64 MSVC 链接库。
+- 仓库已包含 GLAD 的 C 实现、stb、nlohmann/json 和场景资源；外部依赖的头文件与 `.lib` 需要自行准备。
 
-射击行为由 `Weapon`, `Raycast`, `TargetManager`, `ScoreSystem`, `ParticleSystem`, `HitFeedback`, `ScreenShake` 串联。点击射击后触发后坐力和枪口火光，命中后生成粒子、分数、combo、hit marker 和屏幕震动。
+```powershell
+git clone https://github.com/Fragrant0/AimLab.git
+cd AimLab
+```
 
-### 渲染架构重构
+### 构建与运行
 
-当前渲染逻辑已经拆分为 `SkyboxRenderer`, `TerrainRenderer`, `PbrPropRenderer`, `ShadowPassRenderer`, `HudRenderer`, `TargetRenderer`, `WeaponViewRenderer`, `ParticleRenderer` 等模块。资源和内部 GL 对象逐步改为 RAII / `std::unique_ptr` 管理，并加入局部 GL 状态 guard，降低状态泄漏风险。
+在 PowerShell 中配置自己的依赖路径，以下路径仅作示例；多个目录使用分号分隔：
+
+```powershell
+$env:AIMLAB_INCLUDE_DIRS = 'D:\deps\include'
+$env:AIMLAB_LIBRARY_DIRS = 'D:\deps\glfw\lib;D:\deps\assimp\lib'
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\build.ps1
+```
+
+脚本自动定位 VS 2022 的 MSBuild，默认构建 **Debug x64**，也可通过 `-MSBuildPath` 指定位置。已经使用个人 VS 属性表配置依赖时，可以省略上述环境变量。
+
+```powershell
+$env:PATH = "$PWD\DLL;$env:PATH"
+.\x64\Debug\opengl_try.exe
+```
+
+**从仓库根目录运行**，以便读取 `shaders/` 和 `resources/`。Debug 配置链接 `glfw3.lib`、`opengl32.lib` 与 `assimp-vc143-mtd.lib`；运行时 DLL 版本需与链接库匹配，详见 [DLL 说明](DLL/README.md)。
+
+<details>
+<summary><strong>使用 Visual Studio 或 Release 配置</strong></summary>
+
+打开 `opengl_try.sln`，选择 `Debug | x64`。通过个人属性表配置第三方 include / library 路径，将调试工作目录设为 `$(ProjectDir)`，并把 `DLL/` 加入运行环境的 `PATH`。
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\build.ps1 -Configuration Release
+```
+
+Release 配置需要额外准备对应的 `assimp-vc143-mt.lib` 与匹配 DLL；仓库提供的 DLL 为 Debug 版本。第三方库应与目标架构、配置及 MSVC 运行库匹配，当前验证以 Debug x64 为主。
+
+</details>
+
+### 启动冒烟检查
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\smoke_build_run.ps1 -RunSeconds 15
+```
+
+脚本重新构建、启动程序，检查地图、IBL、模型与字体初始化，并拒绝提前退出和已知错误日志。日志写入 `tmp/smoke_run.log`、`tmp/smoke_run.err.log`。它需要图形桌面与 OpenGL 驱动；交互和视觉效果仍需手动验证。
+
+<details>
+<summary><strong>复现固定视角截图</strong></summary>
+
+从根目录运行，先按上文设置 DLL 搜索路径并创建输出目录：
+
+```powershell
+New-Item -ItemType Directory -Force tmp
+.\x64\Debug\opengl_try.exe --capture 1 tmp\nature.ppm
+.\x64\Debug\opengl_try.exe --capture 0 tmp\ocean.ppm
+.\x64\Debug\opengl_try.exe --capture 2 tmp\crater.ppm
+.\x64\Debug\opengl_try.exe --capture 1 tmp\debug.ppm --debug-overlay
+```
+
+`--capture` 在隐藏窗口中渲染固定视角，输出 1600 × 900 的 PPM 图片后退出；OpenGL 错误或写入失败返回非零状态。仍需可用的图形驱动。README 中的 JPEG 由该输出转换，截图模式不用于性能基准。
+
+</details>
 
 ## 操作说明
 
-- `WASD`：移动
-- `Mouse`：视角控制
-- `Left Mouse`：射击
-- `SPACE`：切换线框模式
-- `1/2/3`：切换地图
-- `ESC`：退出
+| 按键 | 功能 |
+| --- | --- |
+| `W A S D` / 鼠标 / 滚轮 | 移动 / 观察 / 调整视野 |
+| `Shift` / 鼠标左键 | 加速 / 单次射击 |
+| `1` / `2` / `3` | 切换 Ocean / Nature / Crater Base，默认进入 Nature |
+| `Space` / `Esc` | 切换线框 / 退出 |
+| `F1` | 显示调试面板 |
+| `F2` | 启用或禁用已选择的水下、像素化效果；保留色调映射与色彩调整 |
+| `F3` / `F4` | 切换 PBR 模型 IBL / PCF 与 PCSS 风格软阴影 |
+| `F5` / `F7` | 切换水下效果 / 像素化 |
+| `F6` / `Q E` | 自由相机 / 自由相机下降、上升 |
+| `Tab` / `← →`（或 `- +`） | 选择调试参数 / 减小、增大；按住 `Shift` 加大步长 |
+| `R` | 恢复调试默认设置 |
 
-## 编码约定
+## 工程结构
 
-项目文本文件统一使用 UTF-8。C++ 编译配置显式启用 `/utf-8`，避免 Visual Studio 或系统代码页把源码按 GB2312/ANSI 误读。
+```text
+AimLab/
+├── include/                  # 玩法、资源与渲染模块头文件
+├── src/                      # main、GameManager 及各模块实现
+├── shaders/                  # GLSL 渲染阶段
+├── resources/
+│   ├── maps_config.json      # 地图、光照、地形与展示模型配置
+│   ├── objects/              # glTF / OBJ 模型及材质
+│   ├── textures/             # 地表、heightmap 与 HDR 环境图
+│   └── fonts/                # HUD 字体
+├── scripts/                  # 构建、启动检查与程序化资源生成
+├── docs/                     # 实机截图与实现说明
+└── opengl_try.sln            # Visual Studio 解决方案
+```
+
+## 当前边界与后续方向
+
+- 地图切换为**同步加载**，会重新加载资源并计算 IBL；尚未实现后台流式加载或 JSON 文件热重载。
+- 粒子采用 **CPU 模拟 + GPU 实例化绘制**，当前容量为 2,000；后续补齐规模测试与 CPU / GPU 帧时基准。
+- 射击检测针对靶球，尚未加入完整的地形与场景模型遮挡检测。
+- 软阴影使用经验半影近似；稳定阴影投影、天空盒旋转与 IBL 方向同步、全场景颜色空间一致性仍有改进空间。
+- Bloom 提取与模糊 shader 尚未接入当前渲染管线；后续计划补齐合成与可复现的效果对比。
+
+欢迎通过 issue 讨论渲染问题或复现情况。贡献约定见 [Repository Guidelines](AGENTS.md)。
+
+## 依赖与参考
+
+[GLFW](https://www.glfw.org/) · [GLAD](https://github.com/Dav1dde/glad) · [GLM](https://github.com/g-truc/glm) · [Assimp](https://github.com/assimp/assimp) · [stb](https://github.com/nothings/stb) · [nlohmann/json](https://github.com/nlohmann/json)
+
+图形学学习参考：[LearnOpenGL](https://learnopengl.com/)。部分资源目录附有第三方许可文件，使用或分发素材前请核对各自许可。
