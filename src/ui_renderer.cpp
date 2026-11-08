@@ -42,9 +42,6 @@ bool UIRenderer::Initialize(int screenWidth, int screenHeight)
 
 void UIRenderer::Cleanup()
 {
-    if (!m_Initialized)
-        return;
-
     if (m_RectVAO) { glDeleteVertexArrays(1, &m_RectVAO); m_RectVAO = 0; }
     if (m_RectVBO) { glDeleteBuffers(1, &m_RectVBO); m_RectVBO = 0; }
     if (m_LineVAO) { glDeleteVertexArrays(1, &m_LineVAO); m_LineVAO = 0; }

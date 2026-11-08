@@ -2,7 +2,9 @@
 #include <GLFW/glfw3.h>
 
 #include <algorithm>
+#include <exception>
 #include <fstream>
+#include <memory>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -17,6 +19,8 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 
 namespace
 {
+    bool g_WindowCallbackFailed = false;
+
     bool SaveCapture(const std::string& path, int width, int height)
     {
         if (width <= 0 || height <= 0)
@@ -137,89 +141,111 @@ int main(int argc, char** argv)
         return -1;
     }
 
-    g_GameManager = new GameManager();
-    if (!g_GameManager->Initialize(window))
+    int exitCode = 1;
+    std::unique_ptr<GameManager> gameManager;
+    try
     {
-        std::cout << "Failed to initialize GameManager" << std::endl;
-        delete g_GameManager;
-        g_GameManager = nullptr;
-        glfwDestroyWindow(window);
-        glfwTerminate();
-        return -1;
-    }
-
-    if (captureMode)
-    {
-        bool captured = false;
-        if (g_GameManager->PrepareShowcase(captureMapIndex, captureDebugOverlay))
+        gameManager = std::make_unique<GameManager>();
+        g_GameManager = gameManager.get();
+        if (!gameManager->Initialize(window))
         {
-            constexpr int captureFrames = 30;
-            constexpr float captureDeltaTime = 1.0f / 60.0f;
-            double previousFrame = glfwGetTime();
-            for (int frame = 0; frame < captureFrames; ++frame)
+            std::cerr << "[FATAL] Game manager initialization failed." << std::endl;
+        }
+        else if (captureMode)
+        {
+            bool captured = false;
+            if (gameManager->PrepareShowcase(captureMapIndex, captureDebugOverlay))
             {
-                const double currentFrame = glfwGetTime();
-                g_GameManager->Update(captureDeltaTime, static_cast<float>(currentFrame - previousFrame));
-                previousFrame = currentFrame;
-                g_GameManager->Render();
-                if (frame + 1 < captureFrames)
-                    glfwSwapBuffers(window);
+                constexpr int captureFrames = 30;
+                constexpr float captureDeltaTime = 1.0f / 60.0f;
+                double previousFrame = glfwGetTime();
+                for (int frame = 0; frame < captureFrames; ++frame)
+                {
+                    const double currentFrame = glfwGetTime();
+                    gameManager->Update(captureDeltaTime, static_cast<float>(currentFrame - previousFrame));
+                    previousFrame = currentFrame;
+                    gameManager->Render();
+                    if (frame + 1 < captureFrames)
+                        glfwSwapBuffers(window);
+                }
+                int width = 0;
+                int height = 0;
+                glfwGetFramebufferSize(window, &width, &height);
+                captured = !g_WindowCallbackFailed && SaveCapture(capturePath, width, height);
             }
-            int width = 0;
-            int height = 0;
-            glfwGetFramebufferSize(window, &width, &height);
-            captured = SaveCapture(capturePath, width, height);
+            else
+            {
+                std::cerr << "[Capture] Could not prepare requested map." << std::endl;
+            }
+            exitCode = captured ? 0 : 1;
         }
         else
         {
-            std::cerr << "[Capture] Could not prepare requested map." << std::endl;
+            double lastFrame = glfwGetTime();
+            while (!glfwWindowShouldClose(window))
+            {
+                int framebufferWidth = 0;
+                int framebufferHeight = 0;
+                glfwGetFramebufferSize(window, &framebufferWidth, &framebufferHeight);
+                if (framebufferWidth <= 0 || framebufferHeight <= 0 || glfwGetWindowAttrib(window, GLFW_ICONIFIED))
+                {
+                    glfwWaitEvents();
+                    lastFrame = glfwGetTime();
+                    continue;
+                }
+
+                const double currentFrame = glfwGetTime();
+                const float frameTime = static_cast<float>(currentFrame - lastFrame);
+                const float deltaTime = std::clamp(frameTime, 0.0f, 0.1f);
+                lastFrame = currentFrame;
+
+                gameManager->ProcessInput(window, deltaTime);
+                gameManager->Update(deltaTime, frameTime);
+                gameManager->Render();
+
+                glfwSwapBuffers(window);
+                glfwPollEvents();
+            }
+            exitCode = g_WindowCallbackFailed ? 1 : 0;
         }
-        delete g_GameManager;
-        g_GameManager = nullptr;
-        glfwDestroyWindow(window);
-        glfwTerminate();
-        return captured ? 0 : 1;
     }
-
-    double lastFrame = glfwGetTime();
-
-    while (!glfwWindowShouldClose(window))
+    catch (const std::exception& error)
     {
-        int framebufferWidth = 0;
-        int framebufferHeight = 0;
-        glfwGetFramebufferSize(window, &framebufferWidth, &framebufferHeight);
-        if (framebufferWidth <= 0 || framebufferHeight <= 0 || glfwGetWindowAttrib(window, GLFW_ICONIFIED))
-        {
-            glfwWaitEvents();
-            lastFrame = glfwGetTime();
-            continue;
-        }
-
-        double currentFrame = glfwGetTime();
-        float frameTime = static_cast<float>(currentFrame - lastFrame);
-        float deltaTime = std::clamp(frameTime, 0.0f, 0.1f);
-        lastFrame = currentFrame;
-
-        g_GameManager->ProcessInput(window, deltaTime);
-        g_GameManager->Update(deltaTime, frameTime);
-        g_GameManager->Render();
-
-        glfwSwapBuffers(window);
-        glfwPollEvents();
+        std::cerr << "[FATAL] Runtime failure: " << error.what() << std::endl;
+    }
+    catch (...)
+    {
+        std::cerr << "[FATAL] Unknown runtime failure." << std::endl;
     }
 
-    delete g_GameManager;
+    // GL resources must be released before their context is destroyed.
     g_GameManager = nullptr;
-
+    gameManager.reset();
     glfwDestroyWindow(window);
     glfwTerminate();
-    return 0;
+    return exitCode;
 }
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
-    if (g_GameManager)
-        g_GameManager->ProcessFramebufferSize(width, height);
+    try
+    {
+        if (g_GameManager)
+            g_GameManager->ProcessFramebufferSize(width, height);
+    }
+    catch (const std::exception& error)
+    {
+        // Do not unwind a C++ exception through GLFW's native callback boundary.
+        std::cerr << "[FATAL] Window resize failed: " << error.what() << std::endl;
+        g_WindowCallbackFailed = true;
+        glfwSetWindowShouldClose(window, GLFW_TRUE);
+    }
+    catch (...)
+    {
+        std::cerr << "[FATAL] Unknown window resize failure." << std::endl;
+        g_WindowCallbackFailed = true;
+        glfwSetWindowShouldClose(window, GLFW_TRUE);
+    }
 }
 
 void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)

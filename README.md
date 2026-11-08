@@ -135,6 +135,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\smoke_build_run.ps
 
 脚本重新构建、启动程序，检查地图、IBL、模型与字体初始化，并拒绝提前退出和已知错误日志。日志写入 `tmp/smoke_run.log`、`tmp/smoke_run.err.log`。它需要图形桌面与 OpenGL 驱动；交互和视觉效果仍需手动验证。
 
+构建后可额外运行初始化失败回归：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\check_startup_failures.ps1
+```
+
+该检查在 `tmp/` 的独立副本中测试缺失 shader、GLSL 编译与链接错误，以及 IBL、字体和后处理的晚期失败。故障必须返回退出码 `1` 并报告对应阶段；原始资源不会修改。
+
 <details>
 <summary><strong>复现固定视角截图</strong></summary>
 

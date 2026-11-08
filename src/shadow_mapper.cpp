@@ -23,32 +23,67 @@ ShadowMapper::~ShadowMapper()
 
 bool ShadowMapper::Initialize(unsigned int size)
 {
+    GLint maxTextureSize = 0;
+    glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxTextureSize);
+    if (size == 0 || maxTextureSize <= 0 || size > static_cast<unsigned int>(maxTextureSize))
+    {
+        std::cerr << "[ShadowMapper] Invalid shadow map size: " << size
+                  << " (texture limit " << maxTextureSize << ")." << std::endl;
+        return false;
+    }
+
     if (m_Initialized)
         return true;
 
+    GLint previousDrawFBO = 0;
+    GLint previousReadFBO = 0;
+    GLint previousTexture = 0;
+    glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &previousDrawFBO);
+    glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &previousReadFBO);
+    glGetIntegerv(GL_TEXTURE_BINDING_2D, &previousTexture);
+
+    try
+    {
+        m_DepthShader = std::make_unique<Shader>("shaders/shadow_depth.vs", "shaders/shadow_depth.fs");
+
+        glGenFramebuffers(1, &m_DepthFBO);
+        glGenTextures(1, &m_DepthMap);
+        glBindTexture(GL_TEXTURE_2D, m_DepthMap);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, size, size, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+        const float borderColor[] = {1.0f, 1.0f, 1.0f, 1.0f};
+        glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+
+        glBindFramebuffer(GL_FRAMEBUFFER, m_DepthFBO);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, m_DepthMap, 0);
+        glDrawBuffer(GL_NONE);
+        glReadBuffer(GL_NONE);
+
+        const GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, previousDrawFBO);
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, previousReadFBO);
+        glBindTexture(GL_TEXTURE_2D, previousTexture);
+        if (!m_DepthFBO || !m_DepthMap || status != GL_FRAMEBUFFER_COMPLETE)
+        {
+            std::cerr << "[ShadowMapper] Shadow framebuffer is incomplete (status 0x"
+                      << std::hex << status << std::dec << ")." << std::endl;
+            Cleanup();
+            return false;
+        }
+    }
+    catch (...)
+    {
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, previousDrawFBO);
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, previousReadFBO);
+        glBindTexture(GL_TEXTURE_2D, previousTexture);
+        Cleanup();
+        throw;
+    }
+
     m_Size = size;
-    m_DepthShader = std::make_unique<Shader>("shaders/shadow_depth.vs", "shaders/shadow_depth.fs");
-
-    glGenFramebuffers(1, &m_DepthFBO);
-    glGenTextures(1, &m_DepthMap);
-    glBindTexture(GL_TEXTURE_2D, m_DepthMap);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, m_Size, m_Size, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-    const float borderColor[] = {1.0f, 1.0f, 1.0f, 1.0f};
-    glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
-
-    glBindFramebuffer(GL_FRAMEBUFFER, m_DepthFBO);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, m_DepthMap, 0);
-    glDrawBuffer(GL_NONE);
-    glReadBuffer(GL_NONE);
-
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-        std::cout << "[ShadowMapper] Shadow framebuffer is incomplete." << std::endl;
-
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
     m_Initialized = true;
     return true;
 }

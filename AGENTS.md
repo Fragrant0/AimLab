@@ -41,6 +41,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\smoke_build_run.ps
 
 当前没有独立单元测试框架、测试命名约定或覆盖率门槛。代码变更至少完成 Debug x64 构建和可用的冒烟检查；日志位于 `tmp/smoke_run.log` 与 `tmp/smoke_run.err.log`。手动验证移动、射击、`1/2/3` 切图、空格线框及退出；渲染修改还需检查阴影、天空盒、HUD 和后处理。
 
+修改初始化、错误传播或资源清理时，构建后运行 `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\check_startup_failures.ps1`。该脚本在 `tmp/` 副本中验证成功启动和故障退出，不改原始 shader。
+
 ## 提交与 Pull Request
 
 沿用 Git 历史和 `.gitmessage` 的 Conventional Commits：`feat:`、`fix:`、`docs:`、`refactor:` 等，可带作用域，例如 `fix(shader): restore shadow sampling`。英文标题使用祈使句、控制在 70 字符内且不加句号。

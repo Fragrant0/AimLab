@@ -16,15 +16,15 @@ public:
 
     bool Initialize(int width, int height);
     void Cleanup();
-    void Resize(int width, int height);
+    bool Resize(int width, int height);
 
     void BeginScene();
     void EndScene();
     void RenderToScreen(float timeSeconds, const PostProcessConfig& config);
 
 private:
-    void CreateSceneTargets();
-    void CreateQuad();
+    bool CreateSceneTargets(int width, int height);
+    bool CreateQuad();
     void DestroySceneTargets();
     void RenderFullscreenQuad() const;
 

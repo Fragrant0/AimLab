@@ -7,7 +7,7 @@
 #include <string>
 #include <fstream>
 #include <sstream>
-#include <iostream>
+#include <stdexcept>
 
 class Shader
 {
@@ -28,47 +28,52 @@ public:
 
     Shader(const char* vertexPath, const char* fragmentPath)
     {
-        std::string vertexCode;
-        std::string fragmentCode;
-        std::ifstream vShaderFile;
-        std::ifstream fShaderFile;
-        vShaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-        fShaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-        try
-        {
-            vShaderFile.open(vertexPath);
-            fShaderFile.open(fragmentPath);
-            std::stringstream vShaderStream, fShaderStream;
-            vShaderStream << vShaderFile.rdbuf();
-            fShaderStream << fShaderFile.rdbuf();
-            vShaderFile.close();
-            fShaderFile.close();
-            vertexCode = vShaderStream.str();
-            fragmentCode = fShaderStream.str();
-        }
-        catch (std::ifstream::failure& e)
-        {
-            std::cout << "ERROR::SHADER::FILE_NOT_SUCCESSFULLY_READ: " << e.what() << std::endl;
-        }
+        const std::string vertexCode = ReadSource(vertexPath, "VERTEX");
+        const std::string fragmentCode = ReadSource(fragmentPath, "FRAGMENT");
+        const std::string programPaths = std::string(vertexPath) + " + " + fragmentPath;
         const char* vShaderCode = vertexCode.c_str();
         const char* fShaderCode = fragmentCode.c_str();
-        unsigned int vertex, fragment;
-        vertex = glCreateShader(GL_VERTEX_SHADER);
-        glShaderSource(vertex, 1, &vShaderCode, NULL);
-        glCompileShader(vertex);
-        checkCompileErrors(vertex, "VERTEX");
-        fragment = glCreateShader(GL_FRAGMENT_SHADER);
-        glShaderSource(fragment, 1, &fShaderCode, NULL);
-        glCompileShader(fragment);
-        checkCompileErrors(fragment, "FRAGMENT");
-        ID = glCreateProgram();
-        glAttachShader(ID, vertex);
-        glAttachShader(ID, fragment);
-        glLinkProgram(ID);
-        checkCompileErrors(ID, "PROGRAM");
+        unsigned int vertex = 0;
+        unsigned int fragment = 0;
+        unsigned int program = 0;
+
+        try
+        {
+            vertex = glCreateShader(GL_VERTEX_SHADER);
+            if (vertex == 0)
+                throw std::runtime_error("[Shader] VERTEX creation failed (" + std::string(vertexPath) + "): OpenGL returned 0.");
+            glShaderSource(vertex, 1, &vShaderCode, nullptr);
+            glCompileShader(vertex);
+            checkCompileErrors(vertex, "VERTEX", vertexPath);
+
+            fragment = glCreateShader(GL_FRAGMENT_SHADER);
+            if (fragment == 0)
+                throw std::runtime_error("[Shader] FRAGMENT creation failed (" + std::string(fragmentPath) + "): OpenGL returned 0.");
+            glShaderSource(fragment, 1, &fShaderCode, nullptr);
+            glCompileShader(fragment);
+            checkCompileErrors(fragment, "FRAGMENT", fragmentPath);
+
+            program = glCreateProgram();
+            if (program == 0)
+                throw std::runtime_error("[Shader] PROGRAM creation failed (" + programPaths + "): OpenGL returned 0.");
+            glAttachShader(program, vertex);
+            glAttachShader(program, fragment);
+            glLinkProgram(program);
+            checkCompileErrors(program, "PROGRAM", programPaths);
+        }
+        catch (...)
+        {
+            if (program != 0) glDeleteProgram(program);
+            if (fragment != 0) glDeleteShader(fragment);
+            if (vertex != 0) glDeleteShader(vertex);
+            throw;
+        }
+
+        glDetachShader(program, vertex);
+        glDetachShader(program, fragment);
         glDeleteShader(vertex);
         glDeleteShader(fragment);
-
+        ID = program;
     }
 
     void use() const
@@ -134,28 +139,56 @@ public:
     }
 
 private:
-    void checkCompileErrors(GLuint shader, std::string type)
+    static std::string ReadSource(const char* path, const char* stage)
     {
-        GLint success;
-        GLchar infoLog[1024];
-        if (type != "PROGRAM")
+        if (!path || *path == '\0')
+            throw std::runtime_error("[Shader] " + std::string(stage) + " file read failed: empty path.");
+
+        std::ifstream file;
+        file.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+        try
         {
-            glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
-            if (!success)
-            {
-                glGetShaderInfoLog(shader, 1024, NULL, infoLog);
-                std::cout << "ERROR::SHADER_COMPILATION_ERROR of type: " << type << "\n" << infoLog << "\n -- --------------------------------------------------- -- " << std::endl;
-            }
+            file.open(path, std::ios::binary);
+            std::ostringstream source;
+            source.exceptions(std::ostringstream::failbit | std::ostringstream::badbit);
+            source << file.rdbuf();
+            file.close();
+            return source.str();
         }
-        else
+        catch (const std::ios_base::failure& error)
         {
+            throw std::runtime_error("[Shader] " + std::string(stage) + " file read failed (" + path + "): " + error.what());
+        }
+    }
+
+    static void checkCompileErrors(GLuint shader, const std::string& type, const std::string& paths)
+    {
+        const bool isProgram = (type == "PROGRAM");
+        GLint success = GL_FALSE;
+        if (isProgram)
             glGetProgramiv(shader, GL_LINK_STATUS, &success);
-            if (!success)
-            {
-                glGetProgramInfoLog(shader, 1024, NULL, infoLog);
-                std::cout << "ERROR::PROGRAM_LINKING_ERROR of type: " << type << "\n" << infoLog << "\n -- --------------------------------------------------- -- " << std::endl;
-            }
-        }
+        else
+            glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
+        if (success == GL_TRUE)
+            return;
+
+        GLint logLength = 0;
+        if (isProgram)
+            glGetProgramiv(shader, GL_INFO_LOG_LENGTH, &logLength);
+        else
+            glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &logLength);
+
+        std::string infoLog(static_cast<std::size_t>(logLength > 0 ? logLength : 1), '\0');
+        GLsizei written = 0;
+        if (isProgram)
+            glGetProgramInfoLog(shader, static_cast<GLsizei>(infoLog.size()), &written, infoLog.data());
+        else
+            glGetShaderInfoLog(shader, static_cast<GLsizei>(infoLog.size()), &written, infoLog.data());
+        infoLog.resize(static_cast<std::size_t>(written > 0 ? written : 0));
+        if (infoLog.empty())
+            infoLog = "OpenGL returned no diagnostic log.";
+
+        throw std::runtime_error("[Shader] " + type + (isProgram ? " link failed (" : " compile failed (") + paths + "):\n" + infoLog);
     }
 };
 #endif

@@ -5,6 +5,87 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <memory>
+#include <stdexcept>
+#include <utility>
+
+namespace
+{
+    struct TextureOwner
+    {
+        explicit TextureOwner(unsigned int texture = 0) : ID(texture) {}
+        ~TextureOwner() { if (ID) glDeleteTextures(1, &ID); }
+        TextureOwner(const TextureOwner&) = delete;
+        TextureOwner& operator=(const TextureOwner&) = delete;
+        unsigned int Release() { return std::exchange(ID, 0); }
+        unsigned int ID;
+    };
+
+    // Capture passes must unwind without leaking GL objects or caller state.
+    struct IBLCapture
+    {
+        IBLCapture()
+        {
+            glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &PreviousDrawFBO);
+            glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &PreviousReadFBO);
+            glGetIntegerv(GL_RENDERBUFFER_BINDING, &PreviousRBO);
+            glGetIntegerv(GL_VIEWPORT, PreviousViewport);
+            glGetIntegerv(GL_CURRENT_PROGRAM, &PreviousProgram);
+            glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &PreviousVAO);
+            glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &PreviousVBO);
+            glGetIntegerv(GL_ACTIVE_TEXTURE, &PreviousActiveTexture);
+            glActiveTexture(GL_TEXTURE0);
+            glGetIntegerv(GL_TEXTURE_BINDING_2D, &PreviousTexture2D);
+            glGetIntegerv(GL_TEXTURE_BINDING_CUBE_MAP, &PreviousCubemap);
+        }
+
+        ~IBLCapture()
+        {
+            if (VAO) glDeleteVertexArrays(1, &VAO);
+            if (VBO) glDeleteBuffers(1, &VBO);
+            if (FBO) glDeleteFramebuffers(1, &FBO);
+            if (RBO) glDeleteRenderbuffers(1, &RBO);
+            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, PreviousDrawFBO);
+            glBindFramebuffer(GL_READ_FRAMEBUFFER, PreviousReadFBO);
+            glBindRenderbuffer(GL_RENDERBUFFER, PreviousRBO);
+            glViewport(PreviousViewport[0], PreviousViewport[1], PreviousViewport[2], PreviousViewport[3]);
+            glUseProgram(PreviousProgram);
+            glBindVertexArray(PreviousVAO);
+            glBindBuffer(GL_ARRAY_BUFFER, PreviousVBO);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, PreviousTexture2D);
+            glBindTexture(GL_TEXTURE_CUBE_MAP, PreviousCubemap);
+            glActiveTexture(PreviousActiveTexture);
+        }
+
+        IBLCapture(const IBLCapture&) = delete;
+        IBLCapture& operator=(const IBLCapture&) = delete;
+
+        unsigned int FBO = 0;
+        unsigned int RBO = 0;
+        unsigned int VAO = 0;
+        unsigned int VBO = 0;
+        TextureOwner Texture;
+
+    private:
+        GLint PreviousDrawFBO = 0;
+        GLint PreviousReadFBO = 0;
+        GLint PreviousRBO = 0;
+        GLint PreviousViewport[4] = {};
+        GLint PreviousProgram = 0;
+        GLint PreviousVAO = 0;
+        GLint PreviousVBO = 0;
+        GLint PreviousActiveTexture = GL_TEXTURE0;
+        GLint PreviousTexture2D = 0;
+        GLint PreviousCubemap = 0;
+    };
+
+    void CheckCaptureFramebuffer(const char* stage)
+    {
+        const GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+        if (status != GL_FRAMEBUFFER_COMPLETE)
+            throw std::runtime_error("[IBL] " + std::string(stage) + " framebuffer incomplete (status " + std::to_string(status) + ").");
+    }
+}
 
 ResourceManager& ResourceManager::GetInstance()
 {
@@ -135,7 +216,8 @@ unsigned int ResourceManager::LoadCubemap(const std::string& name, const std::ve
         return m_Cubemaps[name];
     }
 
-    unsigned int textureID;
+    TextureOwner texture;
+    unsigned int& textureID = texture.ID;
     glGenTextures(1, &textureID);
     glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
 
@@ -160,9 +242,18 @@ unsigned int ResourceManager::LoadCubemap(const std::string& name, const std::ve
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 
-    m_Cubemaps[name] = textureID;
-    PrecomputeIBL(name, textureID);
-    return textureID;
+    auto entry = m_Cubemaps.emplace(name, 0).first;
+    try
+    {
+        PrecomputeIBL(name, textureID);
+    }
+    catch (...)
+    {
+        m_Cubemaps.erase(entry);
+        throw;
+    }
+    entry->second = texture.Release();
+    return entry->second;
 }
 
 unsigned int ResourceManager::GetCubemap(const std::string& name)
@@ -267,8 +358,9 @@ unsigned int ResourceManager::LoadHDRTexture(const std::string& name, const char
     if (hdrTexture == 0)
         return 0;
 
+    TextureOwner texture(hdrTexture);
     m_HDRTextures[name] = hdrTexture;
-    return hdrTexture;
+    return texture.Release();
 }
 
 unsigned int ResourceManager::GetHDRTexture(const std::string& name)
@@ -300,18 +392,36 @@ unsigned int ResourceManager::LoadHDRSkybox(const std::string& name, const char*
         return m_HDRSkyboxes[name];
     }
 
-    unsigned int hdrTexture = LoadHDRTexture(name + "_hdr", hdrPath);
+    const std::string hdrName = name + "_hdr";
+    const bool hadHDRTexture = m_HDRTextures.find(hdrName) != m_HDRTextures.end();
+    unsigned int hdrTexture = LoadHDRTexture(hdrName, hdrPath);
     if (hdrTexture == 0)
     {
         return 0;
     }
 
-    unsigned int cubemapID = CreateCubemapFromHDR(hdrTexture, 512);
-    m_HDRSkyboxes[name] = cubemapID;
-
-    PrecomputeIBL(name, cubemapID);
-
-    return cubemapID;
+    try
+    {
+        TextureOwner cubemap(CreateCubemapFromHDR(hdrTexture, 512));
+        auto entry = m_HDRSkyboxes.emplace(name, 0).first;
+        try
+        {
+            PrecomputeIBL(name, cubemap.ID);
+        }
+        catch (...)
+        {
+            m_HDRSkyboxes.erase(entry);
+            throw;
+        }
+        entry->second = cubemap.Release();
+        return entry->second;
+    }
+    catch (...)
+    {
+        if (!hadHDRTexture)
+            UnloadHDRTexture(hdrName);
+        throw;
+    }
 }
 
 unsigned int ResourceManager::GetHDRSkybox(const std::string& name)
@@ -350,13 +460,14 @@ void ResourceManager::UnloadHDRSkybox(const std::string& name)
 
 unsigned int ResourceManager::CreateCubemapFromHDR(unsigned int hdrTexture, int cubemapSize)
 {
-    GLint prevViewport[4];
-    glGetIntegerv(GL_VIEWPORT, prevViewport);
-
-    unsigned int captureFBO;
-    unsigned int captureRBO;
+    Shader* hdrToCubemapShader = LoadShader("hdr_to_cubemap", "shaders/hdr_to_cubemap.vs", "shaders/hdr_to_cubemap.fs");
+    IBLCapture capture;
+    unsigned int& captureFBO = capture.FBO;
+    unsigned int& captureRBO = capture.RBO;
     glGenFramebuffers(1, &captureFBO);
     glGenRenderbuffers(1, &captureRBO);
+    if (!captureFBO || !captureRBO)
+        throw std::runtime_error("[IBL] HDR capture framebuffer allocation failed.");
 
     glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
     glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
@@ -364,8 +475,10 @@ unsigned int ResourceManager::CreateCubemapFromHDR(unsigned int hdrTexture, int 
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, captureRBO);
 
     // Allocate the target cubemap faces before the capture pass.
-    unsigned int envCubemap;
+    unsigned int& envCubemap = capture.Texture.ID;
     glGenTextures(1, &envCubemap);
+    if (!envCubemap)
+        throw std::runtime_error("[IBL] HDR cubemap allocation failed.");
     glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
     for (unsigned int i = 0; i < 6; ++i)
     {
@@ -376,16 +489,6 @@ unsigned int ResourceManager::CreateCubemapFromHDR(unsigned int hdrTexture, int 
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-    // Render the equirectangular HDR texture into the cubemap.
-    Shader* hdrToCubemapShader = LoadShader("hdr_to_cubemap", "shaders/hdr_to_cubemap.vs", "shaders/hdr_to_cubemap.fs");
-    if (!hdrToCubemapShader)
-    {
-        glDeleteFramebuffers(1, &captureFBO);
-        glDeleteRenderbuffers(1, &captureRBO);
-        glDeleteTextures(1, &envCubemap);
-        return 0;
-    }
 
     glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
     glm::mat4 captureViews[] =
@@ -448,9 +551,12 @@ unsigned int ResourceManager::CreateCubemapFromHDR(unsigned int hdrTexture, int 
          1.0f, -1.0f,  1.0f
     };
 
-    unsigned int skyboxVAO, skyboxVBO;
+    unsigned int& skyboxVAO = capture.VAO;
+    unsigned int& skyboxVBO = capture.VBO;
     glGenVertexArrays(1, &skyboxVAO);
     glGenBuffers(1, &skyboxVBO);
+    if (!skyboxVAO || !skyboxVBO)
+        throw std::runtime_error("[IBL] HDR capture geometry allocation failed.");
     glBindVertexArray(skyboxVAO);
     glBindBuffer(GL_ARRAY_BUFFER, skyboxVBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(skyboxVertices), &skyboxVertices, GL_STATIC_DRAW);
@@ -463,20 +569,14 @@ unsigned int ResourceManager::CreateCubemapFromHDR(unsigned int hdrTexture, int 
     {
         hdrToCubemapShader->setMat4("view", captureViews[i]);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, envCubemap, 0);
+        CheckCaptureFramebuffer("HDR cubemap");
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glBindVertexArray(skyboxVAO);
         glDrawArrays(GL_TRIANGLES, 0, 36);
     }
     glBindVertexArray(0);
 
-    glDeleteVertexArrays(1, &skyboxVAO);
-    glDeleteBuffers(1, &skyboxVBO);
-    glDeleteFramebuffers(1, &captureFBO);
-    glDeleteRenderbuffers(1, &captureRBO);
-
-    glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
-
-    return envCubemap;
+    return capture.Texture.Release();
 }
 
 unsigned int ResourceManager::GetCubeVAO()
@@ -522,34 +622,54 @@ void ResourceManager::PrecomputeIBL(const std::string& skyboxName, unsigned int 
 {
     std::cout << "[IBL] Precomputing IBL for: " << skyboxName << std::endl;
 
-    unsigned int irradiance = CreateIrradianceMap(envCubemap);
-    m_IrradianceMaps[skyboxName] = irradiance;
+    TextureOwner irradiance(CreateIrradianceMap(envCubemap));
+    TextureOwner prefilter(CreatePrefilterMap(envCubemap));
+    TextureOwner brdf(m_BRDFLUT == 0 ? CreateBRDFLUT() : 0);
 
-    unsigned int prefilter = CreatePrefilterMap(envCubemap);
-    m_PrefilterMaps[skyboxName] = prefilter;
-
-    if (m_BRDFLUT == 0)
-        m_BRDFLUT = CreateBRDFLUT();
+    // Allocate both cache entries before transferring any ownership.
+    const auto irradianceEntry = m_IrradianceMaps.emplace(skyboxName, 0);
+    try
+    {
+        const auto prefilterEntry = m_PrefilterMaps.emplace(skyboxName, 0);
+        if (irradianceEntry.first->second)
+            glDeleteTextures(1, &irradianceEntry.first->second);
+        if (prefilterEntry.first->second)
+            glDeleteTextures(1, &prefilterEntry.first->second);
+        irradianceEntry.first->second = irradiance.Release();
+        prefilterEntry.first->second = prefilter.Release();
+        if (brdf.ID)
+            m_BRDFLUT = brdf.Release();
+    }
+    catch (...)
+    {
+        if (irradianceEntry.second)
+            m_IrradianceMaps.erase(irradianceEntry.first);
+        throw;
+    }
 
     std::cout << "[IBL] Precomputation complete." << std::endl;
 }
 
 unsigned int ResourceManager::CreateIrradianceMap(unsigned int envCubemap)
 {
-    GLint prevViewport[4];
-    glGetIntegerv(GL_VIEWPORT, prevViewport);
-
-    unsigned int captureFBO, captureRBO;
+    Shader* irradianceShader = LoadShader("irradiance", "shaders/hdr_to_cubemap.vs", "shaders/irradiance.fs");
+    IBLCapture capture;
+    unsigned int& captureFBO = capture.FBO;
+    unsigned int& captureRBO = capture.RBO;
     glGenFramebuffers(1, &captureFBO);
     glGenRenderbuffers(1, &captureRBO);
+    if (!captureFBO || !captureRBO)
+        throw std::runtime_error("[IBL] Irradiance framebuffer allocation failed.");
 
     glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
     glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 32, 32);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, captureRBO);
 
-    unsigned int irradianceMap;
+    unsigned int& irradianceMap = capture.Texture.ID;
     glGenTextures(1, &irradianceMap);
+    if (!irradianceMap)
+        throw std::runtime_error("[IBL] Irradiance cubemap allocation failed.");
     glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceMap);
     for (unsigned int i = 0; i < 6; ++i)
     {
@@ -560,15 +680,6 @@ unsigned int ResourceManager::CreateIrradianceMap(unsigned int envCubemap)
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-    Shader* irradianceShader = LoadShader("irradiance", "shaders/hdr_to_cubemap.vs", "shaders/irradiance.fs");
-    if (!irradianceShader)
-    {
-        glDeleteFramebuffers(1, &captureFBO);
-        glDeleteRenderbuffers(1, &captureRBO);
-        glDeleteTextures(1, &irradianceMap);
-        return 0;
-    }
 
     glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
     glm::mat4 captureViews[] =
@@ -593,29 +704,30 @@ unsigned int ResourceManager::CreateIrradianceMap(unsigned int envCubemap)
     {
         irradianceShader->setMat4("view", captureViews[i]);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, irradianceMap, 0);
+        CheckCaptureFramebuffer("irradiance");
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         RenderCube();
     }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-    glDeleteFramebuffers(1, &captureFBO);
-    glDeleteRenderbuffers(1, &captureRBO);
-    glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
-
-    return irradianceMap;
+    return capture.Texture.Release();
 }
 
 unsigned int ResourceManager::CreatePrefilterMap(unsigned int envCubemap)
 {
-    GLint prevViewport[4];
-    glGetIntegerv(GL_VIEWPORT, prevViewport);
-
-    unsigned int captureFBO, captureRBO;
+    Shader* prefilterShader = LoadShader("prefilter", "shaders/hdr_to_cubemap.vs", "shaders/prefilter.fs");
+    IBLCapture capture;
+    unsigned int& captureFBO = capture.FBO;
+    unsigned int& captureRBO = capture.RBO;
     glGenFramebuffers(1, &captureFBO);
     glGenRenderbuffers(1, &captureRBO);
+    if (!captureFBO || !captureRBO)
+        throw std::runtime_error("[IBL] Prefilter framebuffer allocation failed.");
 
-    unsigned int prefilterMap;
+    unsigned int& prefilterMap = capture.Texture.ID;
     glGenTextures(1, &prefilterMap);
+    if (!prefilterMap)
+        throw std::runtime_error("[IBL] Prefilter cubemap allocation failed.");
     glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterMap);
     for (unsigned int i = 0; i < 6; ++i)
     {
@@ -627,15 +739,6 @@ unsigned int ResourceManager::CreatePrefilterMap(unsigned int envCubemap)
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
-
-    Shader* prefilterShader = LoadShader("prefilter", "shaders/hdr_to_cubemap.vs", "shaders/prefilter.fs");
-    if (!prefilterShader)
-    {
-        glDeleteFramebuffers(1, &captureFBO);
-        glDeleteRenderbuffers(1, &captureRBO);
-        glDeleteTextures(1, &prefilterMap);
-        return 0;
-    }
 
     glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
     glm::mat4 captureViews[] =
@@ -671,30 +774,31 @@ unsigned int ResourceManager::CreatePrefilterMap(unsigned int envCubemap)
         {
             prefilterShader->setMat4("view", captureViews[i]);
             glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, prefilterMap, mip);
+            CheckCaptureFramebuffer("prefilter");
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             RenderCube();
         }
     }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-    glDeleteFramebuffers(1, &captureFBO);
-    glDeleteRenderbuffers(1, &captureRBO);
-    glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
-
-    return prefilterMap;
+    return capture.Texture.Release();
 }
 
 unsigned int ResourceManager::CreateBRDFLUT()
 {
-    GLint prevViewport[4];
-    glGetIntegerv(GL_VIEWPORT, prevViewport);
-
-    unsigned int captureFBO, captureRBO;
+    Shader* brdfShader = LoadShader("brdf", "shaders/brdf.vs", "shaders/brdf.fs");
+    IBLCapture capture;
+    unsigned int& captureFBO = capture.FBO;
+    unsigned int& captureRBO = capture.RBO;
     glGenFramebuffers(1, &captureFBO);
     glGenRenderbuffers(1, &captureRBO);
+    if (!captureFBO || !captureRBO)
+        throw std::runtime_error("[IBL] BRDF framebuffer allocation failed.");
 
-    unsigned int brdfLUTTexture;
+    unsigned int& brdfLUTTexture = capture.Texture.ID;
     glGenTextures(1, &brdfLUTTexture);
+    if (!brdfLUTTexture)
+        throw std::runtime_error("[IBL] BRDF texture allocation failed.");
     glBindTexture(GL_TEXTURE_2D, brdfLUTTexture);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RG16F, 256, 256, 0, GL_RG, GL_FLOAT, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -706,15 +810,7 @@ unsigned int ResourceManager::CreateBRDFLUT()
     glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 256, 256);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, brdfLUTTexture, 0);
-
-    Shader* brdfShader = LoadShader("brdf", "shaders/brdf.vs", "shaders/brdf.fs");
-    if (!brdfShader)
-    {
-        glDeleteFramebuffers(1, &captureFBO);
-        glDeleteRenderbuffers(1, &captureRBO);
-        glDeleteTextures(1, &brdfLUTTexture);
-        return 0;
-    }
+    CheckCaptureFramebuffer("BRDF LUT");
 
     glViewport(0, 0, 256, 256);
     brdfShader->use();
@@ -727,9 +823,12 @@ unsigned int ResourceManager::CreateBRDFLUT()
          1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
          1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
     };
-    unsigned int quadVAO, quadVBO;
+    unsigned int& quadVAO = capture.VAO;
+    unsigned int& quadVBO = capture.VBO;
     glGenVertexArrays(1, &quadVAO);
     glGenBuffers(1, &quadVBO);
+    if (!quadVAO || !quadVBO)
+        throw std::runtime_error("[IBL] BRDF quad allocation failed.");
     glBindVertexArray(quadVAO);
     glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW);
@@ -740,13 +839,7 @@ unsigned int ResourceManager::CreateBRDFLUT()
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     glBindVertexArray(0);
 
-    glDeleteVertexArrays(1, &quadVAO);
-    glDeleteBuffers(1, &quadVBO);
-    glDeleteFramebuffers(1, &captureFBO);
-    glDeleteRenderbuffers(1, &captureRBO);
-    glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
-
-    return brdfLUTTexture;
+    return capture.Texture.Release();
 }
 
 unsigned int ResourceManager::GetIrradianceMap(const std::string& skyboxName)

@@ -215,9 +215,6 @@ bool FontRenderer::Initialize(int screenWidth, int screenHeight, const std::stri
 
 void FontRenderer::Cleanup()
 {
-    if (!m_Initialized)
-        return;
-
     if (m_AtlasTexture) { glDeleteTextures(1, &m_AtlasTexture); m_AtlasTexture = 0; }
     if (m_VAO) { glDeleteVertexArrays(1, &m_VAO); m_VAO = 0; }
     if (m_VBO) { glDeleteBuffers(1, &m_VBO); m_VBO = 0; }

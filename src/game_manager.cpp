@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <iostream>
+#include <stdexcept>
 
 GameManager::GameManager()
     : m_Window(nullptr),
@@ -58,6 +59,12 @@ GameManager::~GameManager()
 
 bool GameManager::Initialize(GLFWwindow* window)
 {
+    if (m_Initialized)
+        return true;
+
+    if (!window)
+        return false;
+
     m_Window = window;
 
     int framebufferWidth = 0;
@@ -107,10 +114,12 @@ bool GameManager::Initialize(GLFWwindow* window)
         m_Weapon->Initialize();
 
         m_UIRenderer = std::make_unique<UIRenderer>();
-        m_UIRenderer->Initialize(m_ScreenWidth, m_ScreenHeight);
+        if (!m_UIRenderer->Initialize(m_ScreenWidth, m_ScreenHeight))
+            throw std::runtime_error("UI renderer initialization failed.");
 
         m_FontRenderer = std::make_unique<FontRenderer>();
-        m_FontRenderer->Initialize(m_ScreenWidth, m_ScreenHeight, "resources/fonts/consola.ttf");
+        if (!m_FontRenderer->Initialize(m_ScreenWidth, m_ScreenHeight, "resources/fonts/consola.ttf"))
+            throw std::runtime_error("Font renderer initialization failed.");
 
         m_HitFeedback = std::make_unique<HitFeedback>();
         m_HitFeedback->Initialize(m_ScreenWidth, m_ScreenHeight);
@@ -118,10 +127,12 @@ bool GameManager::Initialize(GLFWwindow* window)
         m_ScreenShake = std::make_unique<ScreenShake>();
 
         m_PostProcessRenderer = std::make_unique<PostProcessRenderer>();
-        m_PostProcessRenderer->Initialize(m_ScreenWidth, m_ScreenHeight);
+        if (!m_PostProcessRenderer->Initialize(m_ScreenWidth, m_ScreenHeight))
+            throw std::runtime_error("Post-process renderer initialization failed.");
 
         m_ShadowMapper = std::make_unique<ShadowMapper>();
-        m_ShadowMapper->Initialize(RenderSettings::kShadowMapSize);
+        if (!m_ShadowMapper->Initialize(RenderSettings::kShadowMapSize))
+            throw std::runtime_error("Shadow mapper initialization failed.");
     }
     catch (const std::exception& e)
     {
@@ -208,8 +219,10 @@ void GameManager::UnloadMapResources(int mapIndex)
 
 void GameManager::SetupScene()
 {
-    m_TerrainRenderer.Initialize();
-    m_SkyboxRenderer.Initialize();
+    if (!m_TerrainRenderer.Initialize())
+        throw std::runtime_error("Terrain renderer initialization failed.");
+    if (!m_SkyboxRenderer.Initialize())
+        throw std::runtime_error("Skybox renderer initialization failed.");
 
     SetupTerrain();
     SetupEcology();
@@ -698,9 +711,6 @@ void GameManager::RenderScene(const glm::vec3& mainLightDirection, ShadowMapper*
 
 void GameManager::Cleanup()
 {
-    if (!m_Initialized)
-        return;
-
     m_TerrainRenderer.Cleanup();
     m_SkyboxRenderer.Cleanup();
 
@@ -726,6 +736,7 @@ void GameManager::Cleanup()
     m_HitFeedback.reset();
     m_PostProcessRenderer.reset();
     m_ShadowMapper.reset();
+    m_ScreenShake.reset();
 
     ResourceManager::GetInstance().Clear();
 
@@ -838,6 +849,10 @@ void GameManager::ProcessFramebufferSize(int width, int height)
     if (width <= 0 || height <= 0)
         return;
 
+    if (m_PostProcessRenderer && !m_PostProcessRenderer->Resize(width, height))
+        throw std::runtime_error("Could not resize scene framebuffer to " +
+                                 std::to_string(width) + "x" + std::to_string(height) + ".");
+
     glViewport(0, 0, width, height);
     m_ScreenWidth = width;
     m_ScreenHeight = height;
@@ -847,8 +862,6 @@ void GameManager::ProcessFramebufferSize(int width, int height)
         m_FontRenderer->SetScreenSize(width, height);
     if (m_HitFeedback)
         m_HitFeedback->SetScreenSize(width, height);
-    if (m_PostProcessRenderer)
-        m_PostProcessRenderer->Resize(width, height);
 }
 
 bool GameManager::PrepareShowcase(int mapIndex, bool debugOverlay)
